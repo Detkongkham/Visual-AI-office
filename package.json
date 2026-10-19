@@ -1,0 +1,19 @@
+{
+  "name": "ai-office",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visual AI Dev Office: a 2D office where each AI employee is a Claude Agent SDK agent doing real work",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.303",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

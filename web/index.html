@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="lo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ຫ້ອງການ AI Dev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage"><canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas></div>
+
+<div class="float title">
+  <h1>ຫ້ອງການ AI Dev</h1>
+  <p id="wsLine">ກຳລັງເຊື່ອມຕໍ່…</p>
+  <div class="tools">
+    <button id="bFit" type="button">ເບິ່ງທັງໝົດ</button>
+    <button id="bIn" type="button" aria-label="ຊູມເຂົ້າ">＋</button>
+    <button id="bOut" type="button" aria-label="ຊູມອອກ">－</button>
+    <button id="bFollow" type="button" aria-pressed="false">ຕິດຕາມຄົນທີ່ເລືອກ</button>
+    <button id="bFast" type="button" aria-pressed="false" hidden>×3</button>
+  </div>
+  <p class="warn" id="keyWarn" hidden>ຍັງບໍ່ໄດ້ໃສ່ ANTHROPIC_API_KEY ໃນໄຟລ໌ .env. ວຽກຈະລົ້ມເຫຼວ ຖ້າເຄື່ອງນີ້ບໍ່ໄດ້ login Claude Code ໄວ້.</p>
+</div>
+
+<aside class="float panel">
+  <section id="approvalBox" hidden>
+    <h2>ຂໍອະນຸຍາດ <b id="apCount"></b></h2>
+    <div class="list" id="approvals"></div>
+  </section>
+  <section>
+    <h2>ງົບປະມານມື້ນີ້</h2>
+    <div class="budget"><b id="spend">$0.00</b><span id="spendLimit">/ $0</span></div>
+    <div class="bar"><i id="spendBar"></i></div>
+  </section>
+  <section>
+    <h2>ວຽກ</h2>
+    <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ. ພິມວຽກໃນກ່ອງລຸ່ມສຸດ ແລ້ວກົດ "ສົ່ງວຽກ".</p></div>
+  </section>
+  <section><h2>ທີມ</h2><div class="list" id="team"></div></section>
+  <section><h2>ຫ້ອງ</h2><div class="list" id="rooms"></div></section>
+  <section class="seats"><span>ບ່ອນນັ່ງ</span> <b id="capUsed">0</b>/<b id="capAll">0</b> <span>(ວ່າງ <b id="capFree">0</b>)</span></section>
+</aside>
+
+<div class="float card" id="card" hidden>
+  <div class="ava" id="cAva"></div>
+  <div class="cbody">
+    <h3 id="cName"></h3>
+    <p id="cRole"></p>
+    <span class="pill"><i id="cDot"></i><span id="cDoing"></span></span>
+    <div class="cfg">
+      <label for="cModel">ໂມເດວ</label>
+      <select id="cModel"></select>
+      <label for="cEffort">ລະດັບການຄິດ</label>
+      <select id="cEffort"></select>
+    </div>
+    <p class="access" id="cAccess"></p>
+    <button type="button" class="primary" id="cAssign">ສົ່ງວຽກໃຫ້ຄົນນີ້</button>
+  </div>
+</div>
+
+<form class="float compose" id="compose" autocomplete="off">
+  <div class="row1">
+    <input id="tTitle" name="title" placeholder="ວຽກທີ່ຢາກໃຫ້ທີມເຮັດ ເຊັ່ນ: ສ້າງໜ້າ login ດ້ວຍ HTML" maxlength="200" required>
+    <select id="tAssignee" name="assignee" aria-label="ມອບໃຫ້"></select>
+    <button type="submit" class="primary" id="tSend">ສົ່ງວຽກ</button>
+  </div>
+  <textarea id="tDetail" name="detail" rows="2" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ (ບໍ່ບັງຄັບ)"></textarea>
+  <p class="formMsg" id="formMsg" role="status"></p>
+</form>
+
+<dialog id="taskDlg">
+  <form method="dialog" class="dlgHead"><h3 id="dTitle"></h3><button aria-label="ປິດ">✕</button></form>
+  <p class="dMeta" id="dMeta"></p>
+  <h4>ຜົນລັບ</h4>
+  <pre id="dResult"></pre>
+  <h4>ບັນທຶກການເຮັດວຽກ</h4>
+  <ol id="dLog"></ol>
+  <div class="dActions"><button type="button" id="dStop">ຢຸດວຽກນີ້</button></div>
+</dialog>
+
+<script src="assets/atlas.js"></script>
+<script src="assets/rooms.js"></script>
+<script src="office.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
