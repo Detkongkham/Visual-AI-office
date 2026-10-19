@@ -13,7 +13,11 @@
 
 <div class="float title">
   <h1>ຫ້ອງການ AI Dev</h1>
-  <p id="wsLine">ກຳລັງເຊື່ອມຕໍ່…</p>
+  <div class="authRow">
+    <span class="auth" id="authBadge" data-mode="checking"><i></i><span id="authText">ກຳລັງກວດ login…</span></span>
+    <button type="button" class="link" id="authRecheck">ກວດໃໝ່</button>
+  </div>
+  <p class="authHelp" id="authHelp" hidden>ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ <code>/login</code>. ເມື່ອ login ແລ້ວ ກົດ "ກວດໃໝ່".</p>
   <div class="tools">
     <button id="bFit" type="button">ເບິ່ງທັງໝົດ</button>
     <button id="bIn" type="button" aria-label="ຊູມເຂົ້າ">＋</button>
@@ -21,22 +25,21 @@
     <button id="bFollow" type="button" aria-pressed="false">ຕິດຕາມຄົນທີ່ເລືອກ</button>
     <button id="bFast" type="button" aria-pressed="false" hidden>×3</button>
   </div>
-  <p class="warn" id="keyWarn" hidden>ຍັງບໍ່ໄດ້ໃສ່ ANTHROPIC_API_KEY ໃນໄຟລ໌ .env. ວຽກຈະລົ້ມເຫຼວ ຖ້າເຄື່ອງນີ້ບໍ່ໄດ້ login Claude Code ໄວ້.</p>
 </div>
 
 <aside class="float panel">
   <section id="approvalBox" hidden>
-    <h2>ຂໍອະນຸຍາດ <b id="apCount"></b></h2>
+    <h2>ລໍຖ້າເຈົ້າ <b id="apCount"></b></h2>
     <div class="list" id="approvals"></div>
   </section>
   <section>
-    <h2>ງົບປະມານມື້ນີ້</h2>
+    <h2>ການໃຊ້ງານມື້ນີ້ (ຄ່າປະມານ)</h2>
     <div class="budget"><b id="spend">$0.00</b><span id="spendLimit">/ $0</span></div>
     <div class="bar"><i id="spendBar"></i></div>
   </section>
   <section>
     <h2>ວຽກ</h2>
-    <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ. ພິມວຽກໃນກ່ອງລຸ່ມສຸດ ແລ້ວກົດ "ສົ່ງວຽກ".</p></div>
+    <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ.</p></div>
   </section>
   <section><h2>ທີມ</h2><div class="list" id="team"></div></section>
   <section><h2>ຫ້ອງ</h2><div class="list" id="rooms"></div></section>
@@ -61,9 +64,23 @@
 </div>
 
 <form class="float compose" id="compose" autocomplete="off">
+  <div class="row0">
+    <div class="seg" role="radiogroup" aria-label="ໂໝດການເຮັດວຽກ">
+      <label><input type="radio" name="mode" value="team" checked> 👥 ໂໝດທີມ</label>
+      <label><input type="radio" name="mode" value="single"> 👤 ຄົນດຽວ</label>
+    </div>
+    <select id="tAssignee" aria-label="ມອບໃຫ້" hidden></select>
+    <span class="teamHint" id="teamHint"></span>
+  </div>
+  <div class="row0">
+    <label class="sr" for="tProject">ໂປຣເຈັກ</label>
+    <select id="tProject" aria-label="ໂຟນເດີໂປຣເຈັກ"></select>
+    <button type="button" class="iconBtn" id="pAdd" title="ເພີ່ມໂຟນເດີໂປຣເຈັກ">＋ ໂຟນເດີ</button>
+    <button type="button" class="iconBtn" id="pOpen" title="ເປີດໂຟນເດີນີ້ໃນ Antigravity">📂 ເປີດໃນ Antigravity</button>
+    <select id="tSession" aria-label="Session"></select>
+  </div>
   <div class="row1">
     <input id="tTitle" name="title" placeholder="ວຽກທີ່ຢາກໃຫ້ທີມເຮັດ ເຊັ່ນ: ສ້າງໜ້າ login ດ້ວຍ HTML" maxlength="200" required>
-    <select id="tAssignee" name="assignee" aria-label="ມອບໃຫ້"></select>
     <button type="submit" class="primary" id="tSend">ສົ່ງວຽກ</button>
   </div>
   <textarea id="tDetail" name="detail" rows="2" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ (ບໍ່ບັງຄັບ)"></textarea>
@@ -73,6 +90,11 @@
 <dialog id="taskDlg">
   <form method="dialog" class="dlgHead"><h3 id="dTitle"></h3><button aria-label="ປິດ">✕</button></form>
   <p class="dMeta" id="dMeta"></p>
+  <div class="dLinks">
+    <button type="button" class="iconBtn" id="dOpen">📂 ເປີດໂຟນເດີ</button>
+    <button type="button" class="iconBtn" id="dContinue">↩︎ ສືບຕໍ່ session ນີ້</button>
+  </div>
+  <section id="dPlanBox" hidden><h4>ແຜນງານ</h4><pre id="dPlan"></pre></section>
   <h4>ຜົນລັບ</h4>
   <pre id="dResult"></pre>
   <h4>ບັນທຶກການເຮັດວຽກ</h4>

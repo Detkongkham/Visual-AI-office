@@ -170,7 +170,7 @@
     ceoSeat: roomPt('ceo', 450, 468), ceoStand: roomPt('ceo', 640, 560),
     baSeat1: roomPt('ba', 293, 490), baSeat2: roomPt('ba', 395, 542), baBoard: roomPt('ba', 245, 450),
     core1: roomPt('core', 430, 548), core2: roomPt('core', 560, 605),
-    meet1: roomPt('meet', 470, 568), meet2: roomPt('meet', 300, 520),
+    meet1: roomPt('meet', 470, 568), meet2: roomPt('meet', 300, 520), meet3: roomPt('meet', 640, 520), meet4: roomPt('meet', 560, 610),
     labSeat1: roomPt('lab', 290, 497), labSeat2: roomPt('lab', 545, 602), labSeat3: roomPt('lab', 520, 372), labAct: roomPt('lab', 620, 482),
     qaSeat: roomPt('qa', 555, 332), qaHolo: roomPt('qa', 475, 528),
     opsSeat1: roomPt('ops', 545, 307), opsSeat2: roomPt('ops', 725, 417),
@@ -261,6 +261,11 @@
   function goTo(p, x, z, then) { const path = findPath(p.x, p.z, x, z); if (!path) { then(); return; } p.path = path; p.pi = 1; p.state = 'walk'; p.after = then; }
   const occupied = new Set();
   function think(p) {
+    if (p.forced === 'meet') { // planning meeting in the garden
+      const spots = ['meet1', 'meet2', 'meet3', 'meet4'], m = SP[spots[PEOPLE.indexOf(p) % spots.length]];
+      if (Math.hypot(p.x - m.x, p.z - m.z) > 0.4) { if (p.target) occupied.delete(p.target); goTo(p, m.x, m.z, () => { p.state = 'stand'; p.timer = 0.5; }); return; }
+      p.state = Math.random() < 0.4 && p.actStand ? 'actStand' : 'stand'; p.timer = 2; return;
+    }
     if (p.forced) { // real work from the server: stay at the desk
       const h = SP[p.home];
       if (Math.hypot(p.x - h.x, p.z - h.z) > 0.3) { if (p.target) occupied.delete(p.target); goTo(p, h.x, h.z, () => { p.state = 'sit'; p.timer = 0.5; }); return; }
@@ -398,7 +403,7 @@
   }
 
   // ---------- public API used by app.js ----------
-  const STATUS_OF = { idle: 'idle', working: 'work', waiting: 'review', done: 'done', error: 'review' };
+  const STATUS_OF = { idle: 'idle', working: 'work', meeting: 'work', waiting: 'review', done: 'done', error: 'review' };
   window.OFFICE = {
     people: PEOPLE,
     setLive(key, live) {
@@ -406,6 +411,7 @@
       p.status = STATUS_OF[live.status] || 'idle';
       const was = p.forced;
       if (live.status === 'working') { p.forced = 'work'; p.doing = live.activity; p.bubble = live.activity; }
+      else if (live.status === 'meeting') { p.forced = 'meet'; p.doing = live.activity; p.bubble = live.activity; }
       else if (live.status === 'waiting') { p.forced = 'wait'; p.doing = live.activity; p.bubble = live.activity; }
       else if (live.status === 'done') { p.forced = 'cheer'; p.doing = live.activity; p.bubble = live.activity; setTimeout(() => { if (!p.forced) p.bubble = ''; }, 6000); }
       else { p.forced = null; p.bubble = live.status === 'error' ? live.activity : ''; p.doing = live.activity || 'ລໍຖ້າວຽກ'; }

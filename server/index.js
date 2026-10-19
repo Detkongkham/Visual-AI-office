@@ -1,4 +1,4 @@
-// AI Office server: serves the 2D office and runs each AI employee's tasks with the Claude Agent SDK.
+// AI Office server: serves the 2D office and runs the AI employees with the Claude Agent SDK.
 import 'dotenv/config';
 import express from 'express';
 import fs from 'node:fs';
@@ -6,18 +6,24 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createStore } from './store.js';
-import { runTask, routeTask } from './runner.js';
+import { runTask, runTeam, findSuperpowers } from './runner.js';
+import { detectAuth } from './auth.js';
+import { createProjects, pickFolder, openFolder, sessionsFor } from './projects.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEAM_FILE = path.join(ROOT, 'config', 'team.json');
 const PORT = Number(process.env.PORT || 4317);
-const WORKSPACE = path.resolve(ROOT, process.env.WORKSPACE_DIR || './workspace');
+const DEFAULT_DIR = path.resolve(ROOT, process.env.WORKSPACE_DIR || './workspace');
 const TASK_BUDGET = Number(process.env.TASK_BUDGET_USD || 1);
+const TEAM_BUDGET = Number(process.env.TEAM_BUDGET_USD || 5);
 const DAILY_BUDGET = Number(process.env.DAILY_BUDGET_USD || 10);
+const LEAD = process.env.TEAM_LEAD || 'somphone';
 
-fs.mkdirSync(WORKSPACE, { recursive: true });
+fs.mkdirSync(DEFAULT_DIR, { recursive: true });
 let config = JSON.parse(fs.readFileSync(TEAM_FILE, 'utf8'));
 const store = createStore(path.join(ROOT, 'data', 'state.json'));
+const projects = createProjects(path.join(ROOT, 'data', 'projects.json'), DEFAULT_DIR);
+let auth = { mode: 'checking', label: 'ກຳລັງກວດ login…', env: { ...process.env } };
 
 // live state of each employee
 const live = Object.fromEntries(config.agents.map(a => [a.key, { status: 'idle', activity: 'ວ່າງ', taskId: null }]));
@@ -28,18 +34,23 @@ const approvals = new Map(); // id -> { ...request, resolve }
 // ---------- server-sent events ----------
 const clients = new Set();
 function broadcast(ev) { const data = `data: ${JSON.stringify(ev)}\n\n`; for (const res of clients) res.write(data); }
-function setLive(key, patch) { Object.assign(live[key], patch); broadcast({ type: 'agent', key, ...live[key] }); }
+function setLive(key, patch) { if (!live[key]) return; Object.assign(live[key], patch); broadcast({ type: 'agent', key, ...live[key] }); }
 function taskUpdate(task) { store.touch(); broadcast({ type: 'task', task: publicTask(task) }); }
-const publicTask = t => ({ ...t, log: t.log.slice(-60) });
+const publicTask = t => ({ ...t, log: (t.log || []).slice(-80) });
 const agentByKey = k => config.agents.find(a => a.key === k);
+const publicAuth = () => ({ mode: auth.mode, label: auth.label, email: auth.email, plan: auth.plan });
+
+async function refreshAuth() {
+  auth = { mode: 'checking', label: 'ກຳລັງກວດ login…', env: { ...process.env } }; broadcast({ type: 'auth', auth: publicAuth() });
+  try { auth = await detectAuth(DEFAULT_DIR); } catch (err) { auth = { mode: 'none', label: 'ກວດ login ບໍ່ໄດ້', error: String(err?.message || err), env: { ...process.env } }; }
+  broadcast({ type: 'auth', auth: publicAuth() });
+  console.log(`  Sign-in    →  ${auth.label}${auth.plan ? ' · ' + auth.plan : ''}`);
+}
 
 // ---------- queue ----------
-function enqueue(task) {
-  queues[task.assignee].push(task.id);
-  pump(task.assignee);
-}
+function enqueue(task) { queues[task.assignee].push(task.id); pump(task.assignee); }
 async function pump(key) {
-  if (live[key].status === 'working' || live[key].status === 'waiting') return;
+  if (['working', 'waiting', 'meeting'].includes(live[key].status)) return;
   const id = queues[key].shift(); if (!id) return;
   const task = store.task(id); if (!task || task.status !== 'queued') return pump(key);
   await execute(task);
@@ -47,57 +58,85 @@ async function pump(key) {
 }
 
 async function execute(task) {
-  const agent = agentByKey(task.assignee);
-  const log = (kind, text) => { task.log.push({ t: Date.now(), kind, text }); broadcast({ type: 'log', taskId: task.id, entry: task.log[task.log.length - 1] }); };
-  if (store.spentToday() >= DAILY_BUDGET) {
-    task.status = 'failed'; task.error = `ເກີນງົບປະມານມື້ນີ້ ($${DAILY_BUDGET})`; taskUpdate(task); return;
-  }
+  const lead = agentByKey(task.assignee);
+  const log = (kind, text, who) => { task.log.push({ t: Date.now(), kind, text, who }); broadcast({ type: 'log', taskId: task.id, entry: task.log[task.log.length - 1] }); };
+  if (auth.mode === 'none') { task.status = 'failed'; task.error = 'ຍັງບໍ່ໄດ້ login Claude Code: ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ /login'; taskUpdate(task); return; }
+  if (store.spentToday() >= DAILY_BUDGET) { task.status = 'failed'; task.error = `ເກີນງົບປະມານມື້ນີ້ ($${DAILY_BUDGET})`; taskUpdate(task); return; }
   const ac = new AbortController(); running.set(task.id, ac);
-  Object.assign(task, { status: 'running', startedAt: Date.now(), model: agent.model, effort: agent.effort });
-  taskUpdate(task);
-  setLive(agent.key, { status: 'working', activity: 'ກຳລັງເລີ່ມວຽກ', taskId: task.id });
-  log('info', `${agent.name} ຮັບວຽກ (${agent.model}, effort ${agent.effort})`);
+  const involved = new Set([lead.key]);
+  Object.assign(task, { status: 'running', startedAt: Date.now(), model: lead.model, effort: lead.effort });
+  taskUpdate(task); projects.touch(task.cwd);
+  const team = task.mode === 'team';
+  setLive(lead.key, { status: team ? 'meeting' : 'working', activity: team ? 'ປະຊຸມວາງແຜນ' : 'ກຳລັງເລີ່ມວຽກ', taskId: task.id });
+  log('info', team ? `${lead.name} ເລີ່ມວາງແຜນກັບທີມ (${lead.model})` : `${lead.name} ຮັບວຽກ (${lead.model}, effort ${lead.effort})`, lead.key);
+
+  const askApproval = (kind, payload) => new Promise(resolve => {
+    if (ac.signal.aborted) return resolve(kind === 'plan' ? { allow: false } : false);
+    const id = crypto.randomUUID();
+    const who = payload.who || lead.key;
+    const item = { id, kind, taskId: task.id, agent: who, createdAt: Date.now(), ...payload };
+    approvals.set(id, { ...item, resolve });
+    task.status = 'waiting'; taskUpdate(task);
+    setLive(who, { status: 'waiting', activity: kind === 'plan' ? 'ລໍຖ້າເຈົ້າອະນຸມັດແຜນ' : `ຂໍອະນຸຍາດ: ${payload.summary}` });
+    log('approval', kind === 'plan' ? 'ສົ່ງແຜນໃຫ້ເຈົ້າອະນຸມັດ' : `ຂໍອະນຸຍາດ: ${payload.summary}`, who);
+    broadcast({ type: 'approval', approval: item });
+    ac.signal.addEventListener('abort', () => { if (approvals.delete(id)) { broadcast({ type: 'approvalDone', id }); resolve(kind === 'plan' ? { allow: false } : false); } }, { once: true });
+  });
+
+  // a sub-agent's Agent tool can return before the sub-agent stops working, so wait for quiet before calling it done
+  const doneTimers = new Map();
+  const markDone = (who, isError) => {
+    clearTimeout(doneTimers.get(who));
+    doneTimers.set(who, setTimeout(() => {
+      setLive(who, { status: isError ? 'error' : 'done', activity: isError ? 'ມີບັນຫາ' : 'ສົ່ງວຽກໃຫ້ຫົວໜ້າແລ້ວ', taskId: null }); log('done', `${agentByKey(who)?.name} ສົ່ງວຽກແລ້ວ`, who);
+      setTimeout(() => { if (['done', 'error'].includes(live[who].status)) setLive(who, { status: 'idle', activity: 'ວ່າງ' }); }, 6000);
+    }, 5000));
+  };
+  const emit = ev => {
+    const who = ev.who || lead.key;
+    if (ev.kind === 'tool' || ev.kind === 'say') { const t = doneTimers.get(who); if (t && who !== lead.key) { clearTimeout(t); doneTimers.delete(who); } }
+    if (ev.kind === 'delegate') { involved.add(ev.to); setLive(ev.to, { status: 'working', activity: ev.text, taskId: task.id }); setLive(lead.key, { status: 'working', activity: `ມອບວຽກໃຫ້ ${agentByKey(ev.to)?.name}` }); log('delegate', `${lead.name} → ${agentByKey(ev.to)?.name}: ${ev.text}`, ev.to); }
+    else if (ev.kind === 'mateDone') markDone(who, ev.isError);
+    else if (ev.kind === 'tool') { if (live[who].status !== 'waiting') setLive(who, { status: live[who].status === 'meeting' ? 'meeting' : 'working', activity: ev.text, mode: ev.activity }); log('tool', ev.text, who); }
+    else if (ev.kind === 'say') log('say', ev.text, who);
+  };
+  const onSession = id => { if (!task.sessionId) { task.sessionId = id; taskUpdate(task); } };
+
   try {
-    const result = await runTask({
-      task, agent, workspace: WORKSPACE, team: config.agents, budgetUsd: TASK_BUDGET, abortController: ac,
-      emit: ev => {
-        if (ev.kind === 'tool') { setLive(agent.key, { status: 'working', activity: ev.text, mode: ev.activity }); log('tool', ev.text); }
-        else if (ev.kind === 'say') log('say', ev.text);
-        else log('info', ev.text);
-      },
-      askApproval: req => new Promise(resolve => {
-        if (ac.signal.aborted) return resolve(false);
-        const id = crypto.randomUUID();
-        const item = { id, taskId: task.id, agent: agent.key, tool: req.tool, summary: req.summary, input: req.input, createdAt: Date.now() };
-        approvals.set(id, { ...item, resolve });
-        task.status = 'waiting'; taskUpdate(task);
-        setLive(agent.key, { status: 'waiting', activity: `ຂໍອະນຸຍາດ: ${req.summary}` });
-        log('approval', `ຂໍອະນຸຍາດ: ${req.summary}`);
-        broadcast({ type: 'approval', approval: item });
-        ac.signal.addEventListener('abort', () => { if (approvals.delete(id)) { broadcast({ type: 'approvalDone', id }); resolve(false); } }, { once: true });
-      }),
-    });
+    let result, superpowers;
+    if (team) {
+      ({ result, superpowers } = await runTeam({
+        task, lead, team: config.agents, env: auth.env, budgetUsd: TEAM_BUDGET, abortController: ac, emit, onSession,
+        askApproval: req => askApproval('tool', req),
+        askPlan: async plan => { task.plan = plan; taskUpdate(task); const res = await askApproval('plan', { plan, summary: 'ແຜນງານ' }); if (res.allow) setLive(lead.key, { status: 'working', activity: 'ເລີ່ມແຈກວຽກຕາມແຜນ' }); else setLive(lead.key, { status: 'meeting', activity: 'ກຳລັງແກ້ແຜນ' }); return res; },
+      }));
+      task.superpowers = superpowers;
+    } else {
+      result = await runTask({ task, agent: lead, team: config.agents, env: auth.env, budgetUsd: TASK_BUDGET, abortController: ac, emit, onSession, askApproval: req => askApproval('tool', req) });
+    }
     if (!result) throw new Error('ບໍ່ໄດ້ຮັບຜົນຈາກ agent');
     task.costUsd = result.total_cost_usd || 0; task.turns = result.num_turns; store.addSpend(task.costUsd);
     if (result.subtype === 'success' && !result.is_error) {
       Object.assign(task, { status: 'done', result: result.result });
-      setLive(agent.key, { status: 'done', activity: 'ວຽກສຳເລັດ 🎉', taskId: null });
-      log('done', `ສຳເລັດ · ${result.num_turns} ຮອບ · $${task.costUsd.toFixed(3)}`);
+      setLive(lead.key, { status: 'done', activity: 'ວຽກສຳເລັດ 🎉', taskId: null });
+      log('done', `ສຳເລັດ · ${result.num_turns} ຮອບ · ປະມານ $${task.costUsd.toFixed(3)}`, lead.key);
     } else {
       Object.assign(task, { status: 'failed', error: (result.errors || [result.subtype]).join(', ') });
-      setLive(agent.key, { status: 'error', activity: 'ວຽກບໍ່ສຳເລັດ', taskId: null });
-      log('error', task.error);
+      setLive(lead.key, { status: 'error', activity: 'ວຽກບໍ່ສຳເລັດ', taskId: null });
+      log('error', task.error, lead.key);
     }
   } catch (err) {
     const stopped = ac.signal.aborted;
     Object.assign(task, { status: stopped ? 'stopped' : 'failed', error: stopped ? 'ຖືກຢຸດໂດຍເຈົ້າ' : String(err?.message || err) });
-    setLive(agent.key, { status: stopped ? 'idle' : 'error', activity: stopped ? 'ວ່າງ' : 'ມີບັນຫາ', taskId: null });
-    log('error', task.error);
+    setLive(lead.key, { status: stopped ? 'idle' : 'error', activity: stopped ? 'ວ່າງ' : 'ມີບັນຫາ', taskId: null });
+    log('error', task.error, lead.key);
   } finally {
     running.delete(task.id); task.endedAt = Date.now(); taskUpdate(task);
-    for (const [id, ap] of approvals) if (ap.taskId === task.id) { approvals.delete(id); broadcast({ type: 'approvalDone', id }); ap.resolve(false); }
+    for (const t of doneTimers.values()) clearTimeout(t);
+    for (const [id, ap] of approvals) if (ap.taskId === task.id) { approvals.delete(id); broadcast({ type: 'approvalDone', id }); ap.resolve(ap.kind === 'plan' ? { allow: false } : false); }
+    for (const k of involved) if (k !== lead.key && live[k].taskId === task.id) setLive(k, { status: 'idle', activity: 'ວ່າງ', taskId: null });
     broadcast({ type: 'spend', usd: store.spentToday(), limit: DAILY_BUDGET });
-    setTimeout(() => { if (live[agent.key].status === 'done' || live[agent.key].status === 'error') setLive(agent.key, { status: 'idle', activity: 'ວ່າງ' }); }, 8000);
+    setTimeout(() => { if (['done', 'error'].includes(live[lead.key].status)) setLive(lead.key, { status: 'idle', activity: 'ວ່າງ' }); }, 8000);
   }
 }
 
@@ -105,15 +144,17 @@ async function execute(task) {
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(ROOT, 'web')));
+const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(err => res.status(400).json({ error: String(err?.message || err) }));
 
 app.get('/api/state', (req, res) => res.json({
   agents: config.agents.map(a => ({ ...a, ...live[a.key], queued: queues[a.key].length })),
-  models: config.models, efforts: config.efforts,
+  models: config.models, efforts: config.efforts, lead: LEAD,
   tasks: store.tasks.slice(0, 80).map(publicTask),
   approvals: [...approvals.values()].map(({ resolve, ...a }) => a),
-  spend: { usd: store.spentToday(), limit: DAILY_BUDGET, taskLimit: TASK_BUDGET },
-  workspace: WORKSPACE,
-  hasKey: Boolean(process.env.ANTHROPIC_API_KEY),
+  spend: { usd: store.spentToday(), limit: DAILY_BUDGET, taskLimit: TASK_BUDGET, teamLimit: TEAM_BUDGET },
+  projects: projects.list(),
+  auth: publicAuth(),
+  superpowers: !!findSuperpowers(),
 }));
 
 app.get('/api/events', (req, res) => {
@@ -122,6 +163,25 @@ app.get('/api/events', (req, res) => {
   const ping = setInterval(() => res.write(': ping\n\n'), 20000);
   req.on('close', () => { clearInterval(ping); clients.delete(res); });
 });
+
+app.post('/api/auth/recheck', wrap(async (req, res) => { await refreshAuth(); res.json(publicAuth()); }));
+
+// projects and sessions
+app.get('/api/projects', (req, res) => res.json(projects.list()));
+app.post('/api/projects', wrap((req, res) => { const p = projects.add(req.body?.path); broadcast({ type: 'projects', projects: projects.list() }); res.json(p); }));
+app.post('/api/projects/pick', wrap(async (req, res) => {
+  const dir = await pickFolder(); if (!dir) return res.json({ cancelled: true });
+  const p = projects.add(dir); broadcast({ type: 'projects', projects: projects.list() }); res.json(p);
+}));
+app.post('/api/projects/open', wrap(async (req, res) => {
+  const { path: dir, editor } = req.body || {};
+  if (!projects.has(dir)) throw new Error('ໂຟນເດີນີ້ຍັງບໍ່ຢູ່ໃນລາຍການໂປຣເຈັກ');
+  await openFolder(path.resolve(dir), editor); res.json({ ok: true });
+}));
+app.get('/api/sessions', wrap(async (req, res) => {
+  const dir = String(req.query.dir || ''); if (!projects.has(dir)) throw new Error('ໂຟນເດີນີ້ຍັງບໍ່ຢູ່ໃນລາຍການໂປຣເຈັກ');
+  res.json(await sessionsFor(path.resolve(dir)));
+}));
 
 // change an employee's model / effort
 app.patch('/api/agents/:key', (req, res) => {
@@ -134,19 +194,17 @@ app.patch('/api/agents/:key', (req, res) => {
   res.json(a);
 });
 
-// give a task to someone (or let the team decide)
-app.post('/api/tasks', async (req, res) => {
-  const { title, detail = '', assignee = 'auto' } = req.body || {};
-  if (!title || !String(title).trim()) return res.status(400).json({ error: 'ກະລຸນາໃສ່ຫົວຂໍ້ວຽກ' });
-  let key = assignee, routeCost = 0;
-  if (key === 'auto') {
-    try { ({ key, cost: routeCost } = await routeTask({ title, detail, team: config.agents, workspace: WORKSPACE })); store.addSpend(routeCost); }
-    catch (err) { return res.status(500).json({ error: 'ເລືອກຄົນຮັບວຽກບໍ່ໄດ້: ' + (err?.message || err) }); }
-  }
-  if (!agentByKey(key)) return res.status(400).json({ error: 'ບໍ່ພົບພະນັກງານ' });
-  const task = store.addTask({ id: crypto.randomUUID().slice(0, 8), title: String(title).trim(), detail: String(detail), assignee: key, status: 'queued', createdAt: Date.now(), log: [], costUsd: routeCost });
+// new task: mode 'team' (lead plans + delegates) or 'single' (one employee)
+app.post('/api/tasks', wrap((req, res) => {
+  const { title, detail = '', mode = 'team', assignee, cwd, resume } = req.body || {};
+  if (!title || !String(title).trim()) throw new Error('ກະລຸນາໃສ່ຫົວຂໍ້ວຽກ');
+  const key = mode === 'team' ? LEAD : assignee;
+  if (!agentByKey(key)) throw new Error('ກະລຸນາເລືອກພະນັກງານ');
+  const project = projects.add(cwd || DEFAULT_DIR);
+  const task = store.addTask({ id: crypto.randomUUID().slice(0, 8), mode: mode === 'team' ? 'team' : 'single', title: String(title).trim(), detail: String(detail), assignee: key, cwd: project.path, resume: resume || null, status: 'queued', createdAt: Date.now(), log: [], costUsd: 0 });
+  broadcast({ type: 'projects', projects: projects.list() });
   taskUpdate(task); enqueue(task); res.json(publicTask(task));
-});
+}));
 
 app.post('/api/tasks/:id/stop', (req, res) => {
   const task = store.task(req.params.id); if (!task) return res.status(404).end();
@@ -159,17 +217,17 @@ app.post('/api/tasks/:id/stop', (req, res) => {
 app.post('/api/approvals/:id', (req, res) => {
   const ap = approvals.get(req.params.id); if (!ap) return res.status(404).json({ error: 'ຄຳຂໍນີ້ໝົດອາຍຸແລ້ວ' });
   approvals.delete(ap.id);
-  const allow = Boolean(req.body?.allow);
+  const allow = Boolean(req.body?.allow), feedback = String(req.body?.feedback || '');
   const task = store.task(ap.taskId);
-  if (task && task.status === 'waiting') { task.status = 'running'; task.log.push({ t: Date.now(), kind: 'info', text: allow ? 'ເຈົ້າອະນຸຍາດແລ້ວ' : 'ເຈົ້າບໍ່ອະນຸຍາດ' }); taskUpdate(task); }
-  setLive(ap.agent, { status: 'working', activity: allow ? 'ໄດ້ຮັບອະນຸຍາດ ກຳລັງເຮັດຕໍ່' : 'ຖືກປະຕິເສດ ກຳລັງຫາທາງອື່ນ' });
+  if (task && task.status === 'waiting') { task.status = 'running'; task.log.push({ t: Date.now(), kind: 'info', text: allow ? 'ເຈົ້າອະນຸມັດແລ້ວ' : `ເຈົ້າບໍ່ອະນຸມັດ${feedback ? ': ' + feedback : ''}` }); taskUpdate(task); }
+  if (ap.kind !== 'plan') setLive(ap.agent, { status: 'working', activity: allow ? 'ໄດ້ຮັບອະນຸຍາດ ກຳລັງເຮັດຕໍ່' : 'ຖືກປະຕິເສດ ກຳລັງຫາທາງອື່ນ' });
   broadcast({ type: 'approvalDone', id: ap.id });
-  ap.resolve(allow); res.json({ ok: true });
+  ap.resolve(ap.kind === 'plan' ? { allow, feedback } : allow); res.json({ ok: true });
 });
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`\n  AI Office  →  http://localhost:${PORT}`);
-  console.log(`  Workspace  →  ${WORKSPACE}`);
-  if (!process.env.ANTHROPIC_API_KEY) console.log('  ⚠️  ANTHROPIC_API_KEY is not set in .env – agents will use your Claude Code login if you have one, otherwise tasks will fail.');
-  console.log('');
+  console.log(`  Projects   →  ${projects.list().map(p => p.path).join(', ')}`);
+  console.log(`  Superpowers→  ${findSuperpowers() ? 'ພົບແລ້ວ' : 'ບໍ່ພົບ (ໂໝດທີມຈະວາງແຜນເອງ)'}`);
+  refreshAuth();
 });
