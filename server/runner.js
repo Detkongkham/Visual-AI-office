@@ -75,6 +75,8 @@ async function consume(q, { emit, onInit, keyForParent }) {
       // tool results on the main thread: a finished delegation means that teammate is done
       const content = Array.isArray(msg.message?.content) ? msg.message.content : [];
       for (const block of content) if (block.type === 'tool_result') emit({ kind: 'toolDone', toolUseId: block.tool_use_id, isError: !!block.is_error });
+    } else if (msg.type === 'rate_limit_event') {
+      emit({ kind: 'rateLimit', info: msg.rate_limit_info });
     } else if (msg.type === 'result') {
       final = msg;
     }

@@ -180,3 +180,36 @@ dialog h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); text-trans
   .drawer { left: 12px; max-width: calc(100vw - 24px); z-index: 35; }
   .card, body.drawerOpen .card { left: 12px; width: calc(100vw - 24px); }
 }
+
+/* ---------- right panel: real plan limits + team ---------- */
+:root { --rpanel: 300px; }
+#stage { right: var(--rpanel); }
+.rpanel { position: fixed; right: 0; top: 0; bottom: 0; width: var(--rpanel); z-index: 30; overflow-y: auto; background: var(--chrome); border-left: 1px solid var(--chrome-line); padding: 18px 14px; display: flex; flex-direction: column; gap: 18px; }
+.rHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.rHead h2 { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
+.muted { color: var(--muted); font-size: 11.5px; display: block; margin-top: 6px; }
+.limit { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--chrome-line); border-radius: 14px; background: var(--panel); margin-bottom: 8px; }
+.limit .lt { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.limit b { font-size: 13.5px; }
+.limit .pct { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.limit .bar { margin-top: 2px; height: 8px; }
+.limit .bar i { background: var(--ok); }
+.limit[data-sev="warn"] .bar i { background: var(--warn); }
+.limit[data-sev="crit"] .bar i { background: var(--bad); }
+.limit[data-sev="crit"] .pct { color: var(--bad); }
+.limit small { color: var(--muted); font-size: 11.5px; }
+.foot { border-top: 1px solid var(--chrome-line); padding: 8px; text-align: center; font-size: 11px; color: var(--accent-ink); }
+body.drawerOpen .card { left: calc(var(--side) + var(--drawer) + 28px); }
+.card { max-width: calc(100vw - var(--side) - var(--rpanel) - 32px); }
+.rToggle { display: none; }
+@media (max-width: 1100px) {
+  :root { --rpanel: 260px; }
+}
+@media (max-width: 900px) {
+  #stage { right: 0; }
+  .rpanel { transform: translateX(100%); transition: transform .25s; box-shadow: 0 0 40px rgba(0, 0, 0, .2); }
+  body.rOpen .rpanel { transform: none; }
+  .rToggle { display: block; position: fixed; top: 12px; right: 12px; z-index: 40; border: 1px solid var(--chrome-line); background: var(--panel); border-radius: 12px; padding: 9px 12px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  body.rOpen .rToggle { right: calc(var(--rpanel) + 8px); }
+  .card { max-width: none; }
+}

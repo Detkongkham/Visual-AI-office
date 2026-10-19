@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createStore } from './store.js';
 import { runTask, runTeam, findSuperpowers } from './runner.js';
-import { detectAuth } from './auth.js';
+import { detectAuth, fetchUsage } from './auth.js';
 import { createProjects, pickFolder, openFolder, sessionsFor } from './projects.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,7 +16,6 @@ const PORT = Number(process.env.PORT || 4317);
 const DEFAULT_DIR = path.resolve(ROOT, process.env.WORKSPACE_DIR || './workspace');
 const TASK_BUDGET = Number(process.env.TASK_BUDGET_USD || 1);
 const TEAM_BUDGET = Number(process.env.TEAM_BUDGET_USD || 5);
-const DAILY_BUDGET = Number(process.env.DAILY_BUDGET_USD || 10);
 const LEAD = process.env.TEAM_LEAD || 'somphone';
 
 fs.mkdirSync(DEFAULT_DIR, { recursive: true });
@@ -24,6 +23,7 @@ let config = JSON.parse(fs.readFileSync(TEAM_FILE, 'utf8'));
 const store = createStore(path.join(ROOT, 'data', 'state.json'));
 const projects = createProjects(path.join(ROOT, 'data', 'projects.json'), DEFAULT_DIR);
 let auth = { mode: 'checking', label: 'ກຳລັງກວດ login…', env: { ...process.env } };
+let usage = null; // real plan limits: 5-hour and weekly windows
 
 // live state of each employee
 const live = Object.fromEntries(config.agents.map(a => [a.key, { status: 'idle', activity: 'ວ່າງ', taskId: null }]));
@@ -45,6 +45,23 @@ async function refreshAuth() {
   try { auth = await detectAuth(DEFAULT_DIR); } catch (err) { auth = { mode: 'none', label: 'ກວດ login ບໍ່ໄດ້', error: String(err?.message || err), env: { ...process.env } }; }
   broadcast({ type: 'auth', auth: publicAuth() });
   console.log(`  Sign-in    →  ${auth.label}${auth.plan ? ' · ' + auth.plan : ''}`);
+  refreshUsage();
+}
+let usageBusy = false;
+async function refreshUsage() {
+  if (auth.mode !== 'login' || usageBusy) { if (auth.mode !== 'login') { usage = null; broadcast({ type: 'usage', usage }); } return usage; }
+  usageBusy = true;
+  try { const u = await fetchUsage(auth.env, DEFAULT_DIR); if (u) usage = u; } finally { usageBusy = false; }
+  broadcast({ type: 'usage', usage }); return usage;
+}
+setInterval(refreshUsage, 60_000);
+// rate-limit events arrive while agents work: update the matching window right away
+function applyRateLimit(info) {
+  if (!info || !usage) return;
+  const key = { five_hour: 'fiveHour', seven_day: 'weekly', seven_day_opus: 'weeklyOpus', seven_day_sonnet: 'weeklySonnet' }[info.rateLimitType];
+  if (!key) return;
+  usage[key] = { pct: info.utilization != null ? Math.round(info.utilization * (info.utilization <= 1 ? 100 : 1)) : usage[key]?.pct ?? null, resetsAt: info.resetsAt ? new Date(info.resetsAt * 1000).toISOString() : usage[key]?.resetsAt, status: info.status };
+  broadcast({ type: 'usage', usage });
 }
 
 // ---------- queue ----------
@@ -61,7 +78,7 @@ async function execute(task) {
   const lead = agentByKey(task.assignee);
   const log = (kind, text, who) => { task.log.push({ t: Date.now(), kind, text, who }); broadcast({ type: 'log', taskId: task.id, entry: task.log[task.log.length - 1] }); };
   if (auth.mode === 'none') { task.status = 'failed'; task.error = 'ຍັງບໍ່ໄດ້ login Claude Code: ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ /login'; taskUpdate(task); return; }
-  if (store.spentToday() >= DAILY_BUDGET) { task.status = 'failed'; task.error = `ເກີນງົບປະມານມື້ນີ້ ($${DAILY_BUDGET})`; taskUpdate(task); return; }
+  if (usage?.fiveHour?.pct >= 100) { task.status = 'failed'; task.error = `ໃຊ້ຂີດຈຳກັດ 5 ຊົ່ວໂມງໝົດແລ້ວ. ລໍຖ້າຮອດ ${new Date(usage.fiveHour.resetsAt).toLocaleString()}`; taskUpdate(task); return; }
   const ac = new AbortController(); running.set(task.id, ac);
   const involved = new Set([lead.key]);
   Object.assign(task, { status: 'running', startedAt: Date.now(), model: lead.model, effort: lead.effort });
@@ -99,6 +116,7 @@ async function execute(task) {
     else if (ev.kind === 'mateDone') markDone(who, ev.isError);
     else if (ev.kind === 'tool') { if (live[who].status !== 'waiting') setLive(who, { status: live[who].status === 'meeting' ? 'meeting' : 'working', activity: ev.text, mode: ev.activity }); log('tool', ev.text, who); }
     else if (ev.kind === 'say') log('say', ev.text, who);
+    else if (ev.kind === 'rateLimit') applyRateLimit(ev.info);
   };
   const onSession = id => { if (!task.sessionId) { task.sessionId = id; taskUpdate(task); } };
 
@@ -135,7 +153,7 @@ async function execute(task) {
     for (const t of doneTimers.values()) clearTimeout(t);
     for (const [id, ap] of approvals) if (ap.taskId === task.id) { approvals.delete(id); broadcast({ type: 'approvalDone', id }); ap.resolve(ap.kind === 'plan' ? { allow: false } : false); }
     for (const k of involved) if (k !== lead.key && live[k].taskId === task.id) setLive(k, { status: 'idle', activity: 'ວ່າງ', taskId: null });
-    broadcast({ type: 'spend', usd: store.spentToday(), limit: DAILY_BUDGET });
+    setTimeout(refreshUsage, 1500);
     setTimeout(() => { if (['done', 'error'].includes(live[lead.key].status)) setLive(lead.key, { status: 'idle', activity: 'ວ່າງ' }); }, 8000);
   }
 }
@@ -151,7 +169,7 @@ app.get('/api/state', (req, res) => res.json({
   models: config.models, efforts: config.efforts, lead: LEAD,
   tasks: store.tasks.slice(0, 80).map(publicTask),
   approvals: [...approvals.values()].map(({ resolve, ...a }) => a),
-  spend: { usd: store.spentToday(), limit: DAILY_BUDGET, taskLimit: TASK_BUDGET, teamLimit: TEAM_BUDGET },
+  usage,
   projects: projects.list(),
   auth: publicAuth(),
   superpowers: !!findSuperpowers(),
@@ -164,6 +182,7 @@ app.get('/api/events', (req, res) => {
   req.on('close', () => { clearInterval(ping); clients.delete(res); });
 });
 
+app.post('/api/usage/refresh', wrap(async (req, res) => res.json(await refreshUsage())));
 app.post('/api/auth/recheck', wrap(async (req, res) => { await refreshAuth(); res.json(publicAuth()); }));
 
 // projects and sessions

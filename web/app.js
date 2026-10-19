@@ -1,11 +1,11 @@
 // Connects the office to the server: sidebar + drawer, sign-in status, projects, sessions, tasks, approvals, model choice and live updates.
 (function () {
   const $ = id => document.getElementById(id);
-  const S = { agents: [], models: [], efforts: [], tasks: [], approvals: [], projects: [], sessions: [], spend: { usd: 0, limit: 0 }, auth: {}, lead: 'somphone', project: '' };
+  const S = { agents: [], models: [], efforts: [], tasks: [], approvals: [], projects: [], sessions: [], usage: null, auth: {}, lead: 'somphone', project: '' };
   const STATUS_TEXT = { queued: 'ລໍຖ້າຄິວ', running: 'ກຳລັງເຮັດ', waiting: 'ລໍຖ້າເຈົ້າ', done: 'ສຳເລັດ', failed: 'ບໍ່ສຳເລັດ', stopped: 'ຢຸດແລ້ວ' };
   const EFFORT_TEXT = { low: 'ຕ່ຳ', medium: 'ປານກາງ', high: 'ສູງ', xhigh: 'ສູງຫຼາຍ', max: 'ສູງສຸດ' };
   const ACCESS_TEXT = { read: '🔒 ອ່ານໄດ້ຢ່າງດຽວ (ບໍ່ແກ້ໄຂໄຟລ໌)', write: '✏️ ອ່ານ ແລະ ແກ້ໄຂໄຟລ໌ໄດ້ · ລັນຄຳສັ່ງຕ້ອງຂໍອະນຸຍາດ' };
-  const PANEL_TITLE = { compose: 'ສັ່ງວຽກໃໝ່', approvals: 'ລໍຖ້າເຈົ້າ', tasks: 'ວຽກທັງໝົດ', projects: 'ໂປຣເຈັກ ແລະ session', team: 'ພະນັກງານ', rooms: 'ຫ້ອງ' };
+  const PANEL_TITLE = { compose: 'ສັ່ງວຽກໃໝ່', approvals: 'ລໍຖ້າເຈົ້າ', tasks: 'ວຽກທັງໝົດ', projects: 'ໂປຣເຈັກ ແລະ session', rooms: 'ຫ້ອງ' };
   const AUTH_TEXT = a => a.mode === 'login' ? `Claude Code${a.plan ? ' · ' + a.plan : ''}` : a.mode === 'apiKey' ? 'API key (.env)' : a.mode === 'none' ? 'ຍັງບໍ່ໄດ້ login' : 'ກຳລັງກວດ login…';
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const agent = k => S.agents.find(a => a.key === k);
@@ -36,7 +36,9 @@
   $('drawerClose').onclick = () => openPanel(null);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel && !$('taskDlg').open) openPanel(null); });
   $('menuBtn').onclick = () => { const on = document.body.classList.toggle('menuOpen'); $('menuBtn').setAttribute('aria-expanded', String(on)); };
-  $('team').addEventListener('click', () => { if (window.innerWidth <= 900) openPanel(null); });
+  $('team').addEventListener('click', () => { if (window.innerWidth <= 900) document.body.classList.remove('rOpen'); });
+  $('rToggle').onclick = () => { const on = document.body.classList.toggle('rOpen'); $('rToggle').setAttribute('aria-expanded', String(on)); };
+  $('usageRefresh').onclick = async () => { $('usageNote').textContent = 'ກຳລັງອັບເດດ…'; try { S.usage = await api('/api/usage/refresh', { method: 'POST' }); } catch { /* keep last */ } renderUsage(); };
 
   // ---------- renderers ----------
   function renderAuth() {
@@ -45,11 +47,28 @@
     $('authHelp').hidden = S.auth.mode !== 'none';
     $('authBadge').title = S.auth.email ? `Login: ${S.auth.email}` : '';
   }
-  function renderSpend() {
-    $('spend').textContent = '$' + S.spend.usd.toFixed(2);
-    $('spendLimit').textContent = `ເພດານ $${S.spend.limit.toFixed(2)} ຕໍ່ມື້`;
-    $('spendBar').style.width = Math.min(100, S.spend.usd / (S.spend.limit || 1) * 100) + '%';
+  // real plan limits (5-hour and weekly) from the Claude Code login
+  const untilText = iso => {
+    if (!iso) return '';
+    const ms = new Date(iso) - Date.now(); if (ms <= 0) return 'ກຳລັງຣີເຊັດ';
+    const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4);
+    if (h >= 24) return `ຣີເຊັດ ${new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} ${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `ຣີເຊັດໃນ ${h ? h + ' ຊມ ' : ''}${m} ນາທີ (${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+  };
+  const limitCard = (title, w) => {
+    if (!w) return '';
+    const sev = w.pct >= 90 ? 'crit' : w.pct >= 70 ? 'warn' : 'ok';
+    return `<div class="limit" data-sev="${sev}"><div class="lt"><b>${title}</b><span class="pct">${w.pct}%</span></div><div class="bar"><i style="width:${Math.min(100, w.pct)}%"></i></div><small>${untilText(w.resetsAt)}</small></div>`;
+  };
+  function renderUsage() {
+    const u = S.usage, box = $('usageBox');
+    if (S.auth.mode === 'apiKey') { box.innerHTML = '<p class="empty">ໃຊ້ API key ຢູ່: ບໍ່ມີຂີດຈຳກັດ 5 ຊົ່ວໂມງ ຫຼື ລາຍອາທິດ (ຄິດເງິນຕາມການໃຊ້).</p>'; $('usageNote').textContent = ''; return; }
+    if (!u) { box.innerHTML = `<p class="empty">${S.auth.mode === 'none' ? 'ຕ້ອງ login Claude Code ກ່ອນ.' : 'ກຳລັງໂຫຼດ…'}</p>`; $('usageNote').textContent = ''; return; }
+    if (!u.available) { box.innerHTML = '<p class="empty">ບັນຊີນີ້ບໍ່ມີຂໍ້ມູນຂີດຈຳກັດ.</p>'; return; }
+    box.innerHTML = limitCard('ຮອບ 5 ຊົ່ວໂມງ', u.fiveHour) + limitCard('ລາຍອາທິດ (ທຸກໂມເດວ)', u.weekly) + limitCard('ລາຍອາທິດ · Opus', u.weeklyOpus) + limitCard('ລາຍອາທິດ · Sonnet', u.weeklySonnet);
+    $('usageNote').textContent = `${u.plan ? 'ແພັກເກດ Claude ' + u.plan[0].toUpperCase() + u.plan.slice(1) + ' · ' : ''}ອັບເດດ ${new Date(u.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
+  setInterval(renderUsage, 30_000);
   function renderCounts() {
     setCount($('apCount'), S.approvals.length);
     setCount($('taskCount'), S.tasks.filter(t => ['queued', 'running', 'waiting'].includes(t.status)).length);
@@ -199,7 +218,7 @@
     try { st = await api('/api/state'); } catch (err) { $('authText').textContent = 'ເຊື່ອມຕໍ່ server ບໍ່ໄດ້'; return; }
     Object.assign(S, st);
     S.agents.forEach(a => syncPerson(a.key));
-    renderAuth(); renderAssignees(); renderMode(); renderProjects(); renderTasks(); renderApprovals(); renderSpend(); renderCounts();
+    renderAuth(); renderAssignees(); renderMode(); renderProjects(); renderTasks(); renderApprovals(); renderUsage(); renderCounts();
     loadSessions();
     if (S.approvals.length) openPanel('approvals');
 
@@ -212,8 +231,8 @@
       else if (ev.type === 'log') { const t = S.tasks.find(x => x.id === ev.taskId); if (t) { t.log = [...(t.log || []), ev.entry].slice(-80); if (openTaskId === t.id) renderDialog(); } }
       else if (ev.type === 'approval') { S.approvals.push(ev.approval); renderApprovals(); openPanel('approvals'); window.OFFICE.focus(ev.approval.agent); }
       else if (ev.type === 'approvalDone') { S.approvals = S.approvals.filter(a => a.id !== ev.id); renderApprovals(); }
-      else if (ev.type === 'spend') { S.spend.usd = ev.usd; S.spend.limit = ev.limit; renderSpend(); }
-      else if (ev.type === 'auth') { S.auth = ev.auth; renderAuth(); }
+      else if (ev.type === 'usage') { S.usage = ev.usage; renderUsage(); }
+      else if (ev.type === 'auth') { S.auth = ev.auth; renderAuth(); renderUsage(); }
       else if (ev.type === 'projects') { S.projects = ev.projects; renderProjects(); }
     };
     es.onerror = () => { $('authText').textContent = 'ຂາດການເຊື່ອມຕໍ່ server…'; };

@@ -50,8 +50,7 @@
       <button type="button" class="nav" data-panel="projects"><svg><use href="#i-folder"/></svg><span>ໂປຣເຈັກ ແລະ session</span></button>
     </div>
     <div class="group">
-      <p class="gTitle">ທີມ</p>
-      <button type="button" class="nav" data-panel="team"><svg><use href="#i-users"/></svg><span>ພະນັກງານ</span><b class="count" id="busyCount" hidden></b></button>
+      <p class="gTitle">ຫ້ອງການ</p>
       <button type="button" class="nav" data-panel="rooms"><svg><use href="#i-map"/></svg><span>ຫ້ອງ</span></button>
     </div>
     <div class="group">
@@ -63,12 +62,21 @@
     </div>
   </nav>
 
-  <div class="foot">
-    <div class="usage"><svg><use href="#i-gauge"/></svg><span>ໃຊ້ມື້ນີ້ (ປະມານ)</span><b id="spend">$0.00</b></div>
-    <div class="bar"><i id="spendBar"></i></div>
-    <small id="spendLimit"></small>
-  </div>
+  <div class="foot">AI Dev Office · Claude Agent SDK</div>
 </aside>
+
+<aside class="rpanel" id="rpanel" aria-label="ຂີດຈຳກັດ ແລະ ທີມ">
+  <section>
+    <div class="rHead"><h2>ຂີດຈຳກັດການໃຊ້ງານ</h2><button type="button" class="link" id="usageRefresh">ອັບເດດ</button></div>
+    <div id="usageBox"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
+    <small class="muted" id="usageNote"></small>
+  </section>
+  <section>
+    <div class="rHead"><h2>ທີມ</h2><b class="count" id="busyCount" hidden></b></div>
+    <div class="list" id="team"></div>
+  </section>
+</aside>
+<button type="button" class="rToggle" id="rToggle" aria-controls="rpanel" aria-expanded="false">ທີມ ແລະ ຂີດຈຳກັດ</button>
 
 <div id="stage"><canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas></div>
 
@@ -117,7 +125,6 @@
     <div class="list" id="sessionList"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
   </div>
 
-  <div class="pane" data-pane="team"><div class="list" id="team"></div></div>
   <div class="pane" data-pane="rooms">
     <div class="list" id="rooms"></div>
     <p class="seats">ບ່ອນນັ່ງ <b id="capUsed">0</b>/<b id="capAll">0</b> (ວ່າງ <b id="capFree">0</b>)</p>
