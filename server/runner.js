@@ -6,6 +6,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { toChat } from './chat.js';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 const EDIT_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
@@ -63,6 +64,7 @@ async function consume(q, { emit, onInit, keyForParent }) {
       onInit?.(msg);
     } else if (msg.type === 'assistant') {
       const who = keyForParent(msg.parent_tool_use_id, msg.agent_id);
+      for (const c of toChat(msg, who)) emit({ kind: 'chat', msg: c });
       for (const block of msg.message?.content || []) {
         if (block.type === 'tool_use') {
           const d = describeTool(block.name, block.input);
@@ -71,7 +73,12 @@ async function consume(q, { emit, onInit, keyForParent }) {
           emit({ kind: 'say', who, text: block.text.trim().slice(0, 600) });
         }
       }
+    } else if (msg.type === 'user' && msg.parent_tool_use_id) {
+      // a sub-agent's own tool results, for the history view
+      const who = keyForParent(msg.parent_tool_use_id, msg.agent_id);
+      for (const c of toChat(msg, who)) if (c.type === 'toolResult') emit({ kind: 'chat', msg: c });
     } else if (msg.type === 'user' && !msg.parent_tool_use_id) {
+      for (const c of toChat(msg, keyForParent(null))) if (c.type === 'toolResult') emit({ kind: 'chat', msg: c });
       // tool results on the main thread: a finished delegation means that teammate is done
       const content = Array.isArray(msg.message?.content) ? msg.message.content : [];
       for (const block of content) if (block.type === 'tool_result') emit({ kind: 'toolDone', toolUseId: block.tool_use_id, isError: !!block.is_error });

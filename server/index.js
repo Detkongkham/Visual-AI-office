@@ -9,6 +9,7 @@ import { createStore } from './store.js';
 import { runTask, runTeam, findSuperpowers } from './runner.js';
 import { detectAuth, fetchUsage } from './auth.js';
 import { createProjects, pickFolder, openFolder, sessionsFor } from './projects.js';
+import { sessionChat } from './chat.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEAM_FILE = path.join(ROOT, 'config', 'team.json');
@@ -36,7 +37,9 @@ const clients = new Set();
 function broadcast(ev) { const data = `data: ${JSON.stringify(ev)}\n\n`; for (const res of clients) res.write(data); }
 function setLive(key, patch) { if (!live[key]) return; Object.assign(live[key], patch); broadcast({ type: 'agent', key, ...live[key] }); }
 function taskUpdate(task) { store.touch(); broadcast({ type: 'task', task: publicTask(task) }); }
-const publicTask = t => ({ ...t, log: (t.log || []).slice(-80) });
+const publicTask = ({ messages, ...t }) => ({ ...t, log: (t.log || []).slice(-80), messageCount: (messages || []).length });
+// chat history entries for a task (what the history view shows)
+function addMsg(task, m) { task.messages = task.messages || []; const e = { t: Date.now(), ...m }; task.messages.push(e); if (task.messages.length > 800) task.messages.splice(0, task.messages.length - 800); store.touch(); broadcast({ type: 'msg', taskId: task.id, msg: e }); }
 const agentByKey = k => config.agents.find(a => a.key === k);
 const publicAuth = () => ({ mode: auth.mode, label: auth.label, email: auth.email, plan: auth.plan });
 
@@ -77,6 +80,7 @@ async function pump(key) {
 async function execute(task) {
   const lead = agentByKey(task.assignee);
   const log = (kind, text, who) => { task.log.push({ t: Date.now(), kind, text, who }); broadcast({ type: 'log', taskId: task.id, entry: task.log[task.log.length - 1] }); };
+  if (!(task.messages || []).length) addMsg(task, { type: 'user', who: 'you', text: [task.title, task.detail].filter(Boolean).join('\n\n') });
   if (auth.mode === 'none') { task.status = 'failed'; task.error = 'ຍັງບໍ່ໄດ້ login Claude Code: ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ /login'; taskUpdate(task); return; }
   if (usage?.fiveHour?.pct >= 100) { task.status = 'failed'; task.error = `ໃຊ້ຂີດຈຳກັດ 5 ຊົ່ວໂມງໝົດແລ້ວ. ລໍຖ້າຮອດ ${new Date(usage.fiveHour.resetsAt).toLocaleString()}`; taskUpdate(task); return; }
   const ac = new AbortController(); running.set(task.id, ac);
@@ -96,6 +100,7 @@ async function execute(task) {
     task.status = 'waiting'; taskUpdate(task);
     setLive(who, { status: 'waiting', activity: kind === 'plan' ? 'ລໍຖ້າເຈົ້າອະນຸມັດແຜນ' : `ຂໍອະນຸຍາດ: ${payload.summary}` });
     log('approval', kind === 'plan' ? 'ສົ່ງແຜນໃຫ້ເຈົ້າອະນຸມັດ' : `ຂໍອະນຸຍາດ: ${payload.summary}`, who);
+    if (kind === 'plan') addMsg(task, { type: 'plan', who, text: payload.plan }); else addMsg(task, { type: 'approval', who, summary: payload.summary, input: payload.input?.command || payload.input?.file_path || null });
     broadcast({ type: 'approval', approval: item });
     ac.signal.addEventListener('abort', () => { if (approvals.delete(id)) { broadcast({ type: 'approvalDone', id }); resolve(kind === 'plan' ? { allow: false } : false); } }, { once: true });
   });
@@ -112,7 +117,8 @@ async function execute(task) {
   const emit = ev => {
     const who = ev.who || lead.key;
     if (ev.kind === 'tool' || ev.kind === 'say') { const t = doneTimers.get(who); if (t && who !== lead.key) { clearTimeout(t); doneTimers.delete(who); } }
-    if (ev.kind === 'delegate') { involved.add(ev.to); setLive(ev.to, { status: 'working', activity: ev.text, taskId: task.id }); setLive(lead.key, { status: 'working', activity: `ມອບວຽກໃຫ້ ${agentByKey(ev.to)?.name}` }); log('delegate', `${lead.name} → ${agentByKey(ev.to)?.name}: ${ev.text}`, ev.to); }
+    if (ev.kind === 'chat') { addMsg(task, ev.msg); return; }
+    if (ev.kind === 'delegate') { addMsg(task, { type: 'delegate', who: lead.key, to: ev.to, text: ev.text }); involved.add(ev.to); setLive(ev.to, { status: 'working', activity: ev.text, taskId: task.id }); setLive(lead.key, { status: 'working', activity: `ມອບວຽກໃຫ້ ${agentByKey(ev.to)?.name}` }); log('delegate', `${lead.name} → ${agentByKey(ev.to)?.name}: ${ev.text}`, ev.to); }
     else if (ev.kind === 'mateDone') markDone(who, ev.isError);
     else if (ev.kind === 'tool') { if (live[who].status !== 'waiting') setLive(who, { status: live[who].status === 'meeting' ? 'meeting' : 'working', activity: ev.text, mode: ev.activity }); log('tool', ev.text, who); }
     else if (ev.kind === 'say') log('say', ev.text, who);
@@ -138,16 +144,19 @@ async function execute(task) {
       Object.assign(task, { status: 'done', result: result.result });
       setLive(lead.key, { status: 'done', activity: 'ວຽກສຳເລັດ 🎉', taskId: null });
       log('done', `ສຳເລັດ · ${result.num_turns} ຮອບ · ປະມານ $${task.costUsd.toFixed(3)}`, lead.key);
+      addMsg(task, { type: 'result', who: lead.key, text: result.result, turns: result.num_turns, cost: task.costUsd });
     } else {
       Object.assign(task, { status: 'failed', error: (result.errors || [result.subtype]).join(', ') });
       setLive(lead.key, { status: 'error', activity: 'ວຽກບໍ່ສຳເລັດ', taskId: null });
       log('error', task.error, lead.key);
+      addMsg(task, { type: 'error', who: lead.key, text: task.error });
     }
   } catch (err) {
     const stopped = ac.signal.aborted;
     Object.assign(task, { status: stopped ? 'stopped' : 'failed', error: stopped ? 'ຖືກຢຸດໂດຍເຈົ້າ' : String(err?.message || err) });
     setLive(lead.key, { status: stopped ? 'idle' : 'error', activity: stopped ? 'ວ່າງ' : 'ມີບັນຫາ', taskId: null });
     log('error', task.error, lead.key);
+    addMsg(task, { type: 'error', who: lead.key, text: task.error });
   } finally {
     running.delete(task.id); task.endedAt = Date.now(); taskUpdate(task);
     for (const t of doneTimers.values()) clearTimeout(t);
@@ -197,6 +206,21 @@ app.post('/api/projects/open', wrap(async (req, res) => {
   if (!projects.has(dir)) throw new Error('ໂຟນເດີນີ້ຍັງບໍ່ຢູ່ໃນລາຍການໂປຣເຈັກ');
   await openFolder(path.resolve(dir), editor); res.json({ ok: true });
 }));
+app.get('/api/tasks/:id/messages', (req, res) => {
+  const t = store.task(req.params.id); if (!t) return res.status(404).json({ error: 'ບໍ່ພົບວຽກ' });
+  res.json(t.messages || []);
+});
+app.get('/api/sessions/:id/messages', wrap(async (req, res) => {
+  const dir = String(req.query.dir || ''); if (!projects.has(dir)) throw new Error('ໂຟນເດີນີ້ຍັງບໍ່ຢູ່ໃນລາຍການໂປຣເຈັກ');
+  // a session the office ran itself already has the richer task history
+  // every office task in this conversation (the first one plus each "continue"), oldest first
+  const id = req.params.id;
+  const mine = store.tasks.filter(x => (x.sessionId === id || x.resume === id) && (x.messages || []).length).sort((a, b) => a.createdAt - b.createdAt);
+  if (mine.length && !mine[0].resume) return res.json(mine.flatMap(x => x.messages));
+  // started outside the office (e.g. Claude Code in Antigravity): read the saved transcript, then add office turns
+  const past = await sessionChat(id, path.resolve(dir), 'claude');
+  res.json(past); // the transcript already contains the office's own turns in this session
+}));
 app.get('/api/sessions', wrap(async (req, res) => {
   const dir = String(req.query.dir || ''); if (!projects.has(dir)) throw new Error('ໂຟນເດີນີ້ຍັງບໍ່ຢູ່ໃນລາຍການໂປຣເຈັກ');
   res.json(await sessionsFor(path.resolve(dir)));
@@ -238,6 +262,7 @@ app.post('/api/approvals/:id', (req, res) => {
   approvals.delete(ap.id);
   const allow = Boolean(req.body?.allow), feedback = String(req.body?.feedback || '');
   const task = store.task(ap.taskId);
+  if (task) addMsg(task, { type: 'decision', who: 'you', allow, kind: ap.kind, text: feedback });
   if (task && task.status === 'waiting') { task.status = 'running'; task.log.push({ t: Date.now(), kind: 'info', text: allow ? 'ເຈົ້າອະນຸມັດແລ້ວ' : `ເຈົ້າບໍ່ອະນຸມັດ${feedback ? ': ' + feedback : ''}` }); taskUpdate(task); }
   if (ap.kind !== 'plan') setLive(ap.agent, { status: 'working', activity: allow ? 'ໄດ້ຮັບອະນຸຍາດ ກຳລັງເຮັດຕໍ່' : 'ຖືກປະຕິເສດ ກຳລັງຫາທາງອື່ນ' });
   broadcast({ type: 'approvalDone', id: ap.id });

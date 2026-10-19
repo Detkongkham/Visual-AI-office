@@ -419,6 +419,7 @@
       if (p.forced && p.state !== 'walk') p.timer = Math.min(p.timer, 0.2);
     },
     select: p => select(p),
+    avatar: (el, key, size) => avaStyle(key, el, size),
     focus(key) { const p = PEOPLE.find(q => q.key === key); if (p) { select(p); centerOn(p.x, p.z, Math.max(cam.u, 60)); } },
     onSelect: null,
   };

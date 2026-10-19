@@ -21,6 +21,7 @@
   <symbol id="i-fit" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></symbol>
   <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
   <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
 </svg>
@@ -44,6 +45,7 @@
       <button type="button" class="nav" data-panel="compose"><svg><use href="#i-send"/></svg><span>ສັ່ງວຽກໃໝ່</span></button>
       <button type="button" class="nav" data-panel="approvals"><svg><use href="#i-bell"/></svg><span>ລໍຖ້າເຈົ້າ</span><b class="count warn" id="apCount" hidden></b></button>
       <button type="button" class="nav" data-panel="tasks"><svg><use href="#i-list"/></svg><span>ວຽກທັງໝົດ</span><b class="count" id="taskCount" hidden></b></button>
+      <button type="button" class="nav" data-panel="history"><svg><use href="#i-chat"/></svg><span>ປະຫວັດການສົນທະນາ</span></button>
     </div>
     <div class="group">
       <p class="gTitle">ໂປຣເຈັກ</p>
@@ -115,6 +117,12 @@
     <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ.</p></div>
   </div>
 
+  <div class="pane" data-pane="history">
+    <label class="fl" for="hProject">ໂປຣເຈັກ</label>
+    <select id="hProject"></select>
+    <div class="list" id="historyList"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
+  </div>
+
   <div class="pane" data-pane="projects">
     <div class="list" id="projectList"></div>
     <div class="btnRow">
@@ -148,20 +156,22 @@
   </div>
 </div>
 
-<dialog id="taskDlg">
-  <form method="dialog" class="dlgHead"><h3 id="dTitle"></h3><button aria-label="ປິດ">✕</button></form>
-  <p class="dMeta" id="dMeta"></p>
-  <div class="dLinks">
-    <button type="button" class="iconBtn" id="dOpen">📂 ເປີດໂຟນເດີ</button>
-    <button type="button" class="iconBtn" id="dContinue">↩︎ ສືບຕໍ່ session ນີ້</button>
-  </div>
-  <section id="dPlanBox" hidden><h4>ແຜນງານ</h4><pre id="dPlan"></pre></section>
-  <h4>ຜົນລັບ</h4>
-  <pre id="dResult"></pre>
-  <h4>ບັນທຶກການເຮັດວຽກ</h4>
-  <ol id="dLog"></ol>
-  <div class="dActions"><button type="button" id="dStop">ຢຸດວຽກນີ້</button></div>
-</dialog>
+<section class="chat" id="chat" hidden aria-labelledby="chatTitle">
+  <header class="chatHead">
+    <button type="button" class="iconOnly" id="chatBack" aria-label="ກັບຄືນ"><svg><use href="#i-x"/></svg></button>
+    <div class="chatTitle"><h2 id="chatTitle"></h2><p id="chatMeta"></p></div>
+    <div class="chatTools">
+      <button type="button" class="iconBtn" id="chatOpen">📂 ເປີດໂຟນເດີ</button>
+      <button type="button" class="iconBtn danger" id="chatStop" hidden>■ ຢຸດ</button>
+    </div>
+  </header>
+  <div class="chatScroll" id="chatScroll"><div class="chatInner" id="chatList"></div></div>
+  <form class="chatComposer" id="chatForm" autocomplete="off">
+    <textarea id="chatInput" rows="1" placeholder="ພິມຂໍ້ຄວາມເພື່ອເຮັດຕໍ່ໃນການສົນທະນານີ້…"></textarea>
+    <button type="submit" class="primary" id="chatSend" aria-label="ສົ່ງ"><svg><use href="#i-send"/></svg></button>
+    <p class="chatNote" id="chatNote"></p>
+  </form>
+</section>
 
 <script src="assets/atlas.js"></script>
 <script src="assets/rooms.js"></script>
