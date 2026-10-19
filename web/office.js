@@ -354,9 +354,9 @@
 
   // ---------- camera + input ----------
   function fit() {
-    const pw = W > 760 ? 320 : 0, ph = W > 760 ? 0 : H * 0.36, aw = W - pw - 32, ah = H - ph - 40;
+    const aw = W - 32, ah = H - 40; // the canvas already sits beside the sidebar
     cam.u = Math.min(aw / ((X1 - X0) + (Z1 - Z0)), ah / (((X1 - X0) + (Z1 - Z0)) * 0.5 + 4.5));
-    cam.ox = 0; cam.oy = 0; const [sx, sy] = P((X0 + X1) / 2, (Z0 + Z1) / 2, 1.6); cam.ox = 16 + aw / 2 - sx; cam.oy = (W > 760 ? 34 : 20) + ah / 2 - sy;
+    cam.ox = 0; cam.oy = 0; const [sx, sy] = P((X0 + X1) / 2, (Z0 + Z1) / 2, 1.6); cam.ox = 16 + aw / 2 - sx; cam.oy = 20 + ah / 2 - sy;
   }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; fit(); }
   addEventListener('resize', resize); resize();
@@ -377,7 +377,7 @@
   document.getElementById('bOut').onclick = () => zoomAt(1 / 1.3, W / 2, H / 2);
   bFollow.onclick = () => { follow = !follow && !!selected; bFollow.setAttribute('aria-pressed', String(follow)); if (follow && cam.u < 60) zoomAt(70 / cam.u, W / 2, H / 2); };
   bFast.onclick = () => { speed = speed === 1 ? 3 : 1; bFast.setAttribute('aria-pressed', String(speed !== 1)); };
-  const viewC = () => [W > 760 ? (W - 320) / 2 : W / 2, W > 760 ? H / 2 : H * 0.32];
+  const viewC = () => { const d = document.body.classList.contains('drawerOpen') && W > 760 ? 400 : 0; return [d + (W - d) / 2, H / 2]; };
   function centerOn(x, z, u) { if (u) cam.u = u; const [sx, sy] = P(x, z, 1), [vx, vy] = viewC(); cam.ox += vx - sx; cam.oy += vy - sy; }
 
   // ---------- panel + card ----------
@@ -390,7 +390,7 @@
     b.onclick = () => { select(p); centerOn(p.x, p.z, Math.max(cam.u, 60)); }; teamEl.appendChild(b); rowsEl[p.key] = b; });
   const roomsEl = document.getElementById('rooms');
   ROOMS.forEach(r => { const b = document.createElement('button'); b.className = 'row'; b.type = 'button'; b.innerHTML = `<i class="ico">${r.ico}</i><div><b>${r.name}</b></div>`;
-    b.onclick = () => { follow = false; bFollow.setAttribute('aria-pressed', 'false'); centerOn(r.x0 + S / 2, r.z0 + S / 2, Math.min(150, (W > 760 ? W - 380 : W - 40) / (2 * S + 1))); }; roomsEl.appendChild(b); });
+    b.onclick = () => { follow = false; bFollow.setAttribute('aria-pressed', 'false'); centerOn(r.x0 + S / 2, r.z0 + S / 2, Math.min(150, (W - 60) / (2 * S + 1))); }; roomsEl.appendChild(b); });
   function select(p) {
     selected = p; window.OFFICE && window.OFFICE.onSelect && window.OFFICE.onSelect(p); card.hidden = !p; Object.values(rowsEl).forEach(b => b.removeAttribute('aria-current'));
     if (!p) { follow = false; bFollow.setAttribute('aria-pressed', 'false'); return; }

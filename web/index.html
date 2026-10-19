@@ -9,44 +9,122 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="stage"><canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- icon set (Lucide, ISC licence) -->
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+</svg>
 
-<div class="float title">
-  <h1>ຫ້ອງການ AI Dev</h1>
+<button type="button" class="menuBtn" id="menuBtn" aria-label="ເປີດເມນູ" aria-controls="sidebar" aria-expanded="false"><svg><use href="#i-menu"/></svg></button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="mark" aria-hidden="true">🧠</div>
+    <div class="brandText"><b>ຫ້ອງການ AI Dev</b><span id="teamCount">ທີມ 15 ຄົນ</span></div>
+  </div>
   <div class="authRow">
     <span class="auth" id="authBadge" data-mode="checking"><i></i><span id="authText">ກຳລັງກວດ login…</span></span>
     <button type="button" class="link" id="authRecheck">ກວດໃໝ່</button>
   </div>
-  <p class="authHelp" id="authHelp" hidden>ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ <code>/login</code>. ເມື່ອ login ແລ້ວ ກົດ "ກວດໃໝ່".</p>
-  <div class="tools">
-    <button id="bFit" type="button">ເບິ່ງທັງໝົດ</button>
-    <button id="bIn" type="button" aria-label="ຊູມເຂົ້າ">＋</button>
-    <button id="bOut" type="button" aria-label="ຊູມອອກ">－</button>
-    <button id="bFollow" type="button" aria-pressed="false">ຕິດຕາມຄົນທີ່ເລືອກ</button>
-    <button id="bFast" type="button" aria-pressed="false" hidden>×3</button>
-  </div>
-</div>
+  <p class="authHelp" id="authHelp" hidden>ເປີດ Claude Code ໃນ Antigravity ແລ້ວພິມ <code>/login</code> ຈາກນັ້ນກົດ "ກວດໃໝ່".</p>
 
-<aside class="float panel">
-  <section id="approvalBox" hidden>
-    <h2>ລໍຖ້າເຈົ້າ <b id="apCount"></b></h2>
-    <div class="list" id="approvals"></div>
-  </section>
-  <section>
-    <h2>ການໃຊ້ງານມື້ນີ້ (ຄ່າປະມານ)</h2>
-    <div class="budget"><b id="spend">$0.00</b><span id="spendLimit">/ $0</span></div>
+  <nav aria-label="ເມນູ">
+    <div class="group">
+      <p class="gTitle active"><span aria-hidden="true"></span>ວຽກງານ</p>
+      <button type="button" class="nav" data-panel="compose"><svg><use href="#i-send"/></svg><span>ສັ່ງວຽກໃໝ່</span></button>
+      <button type="button" class="nav" data-panel="approvals"><svg><use href="#i-bell"/></svg><span>ລໍຖ້າເຈົ້າ</span><b class="count warn" id="apCount" hidden></b></button>
+      <button type="button" class="nav" data-panel="tasks"><svg><use href="#i-list"/></svg><span>ວຽກທັງໝົດ</span><b class="count" id="taskCount" hidden></b></button>
+    </div>
+    <div class="group">
+      <p class="gTitle">ໂປຣເຈັກ</p>
+      <button type="button" class="nav" data-panel="projects"><svg><use href="#i-folder"/></svg><span>ໂປຣເຈັກ ແລະ session</span></button>
+    </div>
+    <div class="group">
+      <p class="gTitle">ທີມ</p>
+      <button type="button" class="nav" data-panel="team"><svg><use href="#i-users"/></svg><span>ພະນັກງານ</span><b class="count" id="busyCount" hidden></b></button>
+      <button type="button" class="nav" data-panel="rooms"><svg><use href="#i-map"/></svg><span>ຫ້ອງ</span></button>
+    </div>
+    <div class="group">
+      <p class="gTitle">ມຸມມອງ</p>
+      <button type="button" class="nav" id="bFit"><svg><use href="#i-fit"/></svg><span>ເບິ່ງທັງໝົດ</span></button>
+      <button type="button" class="nav" id="bFollow" aria-pressed="false"><svg><use href="#i-target"/></svg><span>ຕິດຕາມຄົນທີ່ເລືອກ</span></button>
+      <div class="zoomRow"><button type="button" id="bOut" aria-label="ຊູມອອກ">－</button><span>ຊູມ</span><button type="button" id="bIn" aria-label="ຊູມເຂົ້າ">＋</button></div>
+      <button type="button" id="bFast" aria-pressed="false" hidden>×3</button>
+    </div>
+  </nav>
+
+  <div class="foot">
+    <div class="usage"><svg><use href="#i-gauge"/></svg><span>ໃຊ້ມື້ນີ້ (ປະມານ)</span><b id="spend">$0.00</b></div>
     <div class="bar"><i id="spendBar"></i></div>
-  </section>
-  <section>
-    <h2>ວຽກ</h2>
-    <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ.</p></div>
-  </section>
-  <section><h2>ທີມ</h2><div class="list" id="team"></div></section>
-  <section><h2>ຫ້ອງ</h2><div class="list" id="rooms"></div></section>
-  <section class="seats"><span>ບ່ອນນັ່ງ</span> <b id="capUsed">0</b>/<b id="capAll">0</b> <span>(ວ່າງ <b id="capFree">0</b>)</span></section>
+    <small id="spendLimit"></small>
+  </div>
 </aside>
 
-<div class="float card" id="card" hidden>
+<div id="stage"><canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas></div>
+
+<!-- slide-out panel next to the sidebar -->
+<section class="drawer" id="drawer" hidden aria-labelledby="drawerTitle">
+  <header><h2 id="drawerTitle"></h2><button type="button" class="iconOnly" id="drawerClose" aria-label="ປິດ"><svg><use href="#i-x"/></svg></button></header>
+
+  <div class="pane" data-pane="compose">
+    <form id="compose" autocomplete="off">
+      <div class="seg" role="radiogroup" aria-label="ໂໝດການເຮັດວຽກ">
+        <label><input type="radio" name="mode" value="team" checked> 👥 ໂໝດທີມ</label>
+        <label><input type="radio" name="mode" value="single"> 👤 ຄົນດຽວ</label>
+      </div>
+      <p class="hint" id="teamHint"></p>
+      <label class="fl" for="tAssignee" id="tAssigneeLabel">ມອບໃຫ້</label>
+      <select id="tAssignee"></select>
+      <label class="fl" for="tProject">ໂປຣເຈັກ</label>
+      <select id="tProject"></select>
+      <label class="fl" for="tSession">Session</label>
+      <select id="tSession"></select>
+      <label class="fl" for="tTitle">ວຽກ</label>
+      <input id="tTitle" name="title" placeholder="ເຊັ່ນ: ສ້າງໜ້າ login ດ້ວຍ HTML" maxlength="200" required>
+      <label class="fl" for="tDetail">ລາຍລະອຽດ (ບໍ່ບັງຄັບ)</label>
+      <textarea id="tDetail" name="detail" rows="5"></textarea>
+      <button type="submit" class="primary wide" id="tSend">ສົ່ງວຽກ</button>
+      <p class="formMsg" id="formMsg" role="status"></p>
+    </form>
+  </div>
+
+  <div class="pane" data-pane="approvals">
+    <div class="list" id="approvals"></div>
+    <p class="empty" id="apEmpty">ບໍ່ມີຫຍັງລໍຖ້າເຈົ້າ.</p>
+  </div>
+
+  <div class="pane" data-pane="tasks">
+    <div class="list" id="tasks"><p class="empty">ຍັງບໍ່ມີວຽກ.</p></div>
+  </div>
+
+  <div class="pane" data-pane="projects">
+    <div class="list" id="projectList"></div>
+    <div class="btnRow">
+      <button type="button" class="iconBtn" id="pAdd">＋ ເພີ່ມໂຟນເດີ</button>
+      <button type="button" class="iconBtn" id="pOpen">📂 ເປີດໃນ Antigravity</button>
+    </div>
+    <h3 class="sub">Session ຂອງໂປຣເຈັກທີ່ເລືອກ</h3>
+    <div class="list" id="sessionList"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
+  </div>
+
+  <div class="pane" data-pane="team"><div class="list" id="team"></div></div>
+  <div class="pane" data-pane="rooms">
+    <div class="list" id="rooms"></div>
+    <p class="seats">ບ່ອນນັ່ງ <b id="capUsed">0</b>/<b id="capAll">0</b> (ວ່າງ <b id="capFree">0</b>)</p>
+  </div>
+</section>
+
+<div class="card" id="card" hidden>
   <div class="ava" id="cAva"></div>
   <div class="cbody">
     <h3 id="cName"></h3>
@@ -62,30 +140,6 @@
     <button type="button" class="primary" id="cAssign">ສົ່ງວຽກໃຫ້ຄົນນີ້</button>
   </div>
 </div>
-
-<form class="float compose" id="compose" autocomplete="off">
-  <div class="row0">
-    <div class="seg" role="radiogroup" aria-label="ໂໝດການເຮັດວຽກ">
-      <label><input type="radio" name="mode" value="team" checked> 👥 ໂໝດທີມ</label>
-      <label><input type="radio" name="mode" value="single"> 👤 ຄົນດຽວ</label>
-    </div>
-    <select id="tAssignee" aria-label="ມອບໃຫ້" hidden></select>
-    <span class="teamHint" id="teamHint"></span>
-  </div>
-  <div class="row0">
-    <label class="sr" for="tProject">ໂປຣເຈັກ</label>
-    <select id="tProject" aria-label="ໂຟນເດີໂປຣເຈັກ"></select>
-    <button type="button" class="iconBtn" id="pAdd" title="ເພີ່ມໂຟນເດີໂປຣເຈັກ">＋ ໂຟນເດີ</button>
-    <button type="button" class="iconBtn" id="pOpen" title="ເປີດໂຟນເດີນີ້ໃນ Antigravity">📂 ເປີດໃນ Antigravity</button>
-    <select id="tSession" aria-label="Session"></select>
-  </div>
-  <div class="row1">
-    <input id="tTitle" name="title" placeholder="ວຽກທີ່ຢາກໃຫ້ທີມເຮັດ ເຊັ່ນ: ສ້າງໜ້າ login ດ້ວຍ HTML" maxlength="200" required>
-    <button type="submit" class="primary" id="tSend">ສົ່ງວຽກ</button>
-  </div>
-  <textarea id="tDetail" name="detail" rows="2" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ (ບໍ່ບັງຄັບ)"></textarea>
-  <p class="formMsg" id="formMsg" role="status"></p>
-</form>
 
 <dialog id="taskDlg">
   <form method="dialog" class="dlgHead"><h3 id="dTitle"></h3><button aria-label="ປິດ">✕</button></form>

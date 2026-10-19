@@ -1,11 +1,12 @@
-// Connects the office to the server: sign-in status, projects, sessions, tasks, approvals, model choice and live updates.
+// Connects the office to the server: sidebar + drawer, sign-in status, projects, sessions, tasks, approvals, model choice and live updates.
 (function () {
   const $ = id => document.getElementById(id);
-  const S = { agents: [], models: [], efforts: [], tasks: [], approvals: [], projects: [], sessions: [], spend: { usd: 0, limit: 0 }, auth: {}, lead: 'somphone' };
+  const S = { agents: [], models: [], efforts: [], tasks: [], approvals: [], projects: [], sessions: [], spend: { usd: 0, limit: 0 }, auth: {}, lead: 'somphone', project: '' };
   const STATUS_TEXT = { queued: 'ລໍຖ້າຄິວ', running: 'ກຳລັງເຮັດ', waiting: 'ລໍຖ້າເຈົ້າ', done: 'ສຳເລັດ', failed: 'ບໍ່ສຳເລັດ', stopped: 'ຢຸດແລ້ວ' };
   const EFFORT_TEXT = { low: 'ຕ່ຳ', medium: 'ປານກາງ', high: 'ສູງ', xhigh: 'ສູງຫຼາຍ', max: 'ສູງສຸດ' };
   const ACCESS_TEXT = { read: '🔒 ອ່ານໄດ້ຢ່າງດຽວ (ບໍ່ແກ້ໄຂໄຟລ໌)', write: '✏️ ອ່ານ ແລະ ແກ້ໄຂໄຟລ໌ໄດ້ · ລັນຄຳສັ່ງຕ້ອງຂໍອະນຸຍາດ' };
-  const AUTH_TEXT = a => a.mode === 'login' ? `ເຊື່ອມກັບ Claude Code ແລ້ວ${a.plan ? ' · ' + a.plan : ''}` : a.mode === 'apiKey' ? 'ໃຊ້ API key ຈາກ .env' : a.mode === 'none' ? 'ຍັງບໍ່ໄດ້ login Claude Code' : 'ກຳລັງກວດ login…';
+  const PANEL_TITLE = { compose: 'ສັ່ງວຽກໃໝ່', approvals: 'ລໍຖ້າເຈົ້າ', tasks: 'ວຽກທັງໝົດ', projects: 'ໂປຣເຈັກ ແລະ session', team: 'ພະນັກງານ', rooms: 'ຫ້ອງ' };
+  const AUTH_TEXT = a => a.mode === 'login' ? `Claude Code${a.plan ? ' · ' + a.plan : ''}` : a.mode === 'apiKey' ? 'API key (.env)' : a.mode === 'none' ? 'ຍັງບໍ່ໄດ້ login' : 'ກຳລັງກວດ login…';
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const agent = k => S.agents.find(a => a.key === k);
   const api = async (url, opts = {}) => {
@@ -17,6 +18,25 @@
   const say = t => { $('formMsg').textContent = t; };
   const waitOffice = () => new Promise(res => { const t = setInterval(() => { if (window.OFFICE) { clearInterval(t); res(); } }, 50); });
   const mode = () => document.querySelector('input[name="mode"]:checked').value;
+  const setCount = (el, n) => { el.hidden = !n; el.textContent = n || ''; };
+
+  // ---------- sidebar + drawer ----------
+  let panel = null;
+  function openPanel(name) {
+    panel = name;
+    $('drawer').hidden = !name; document.body.classList.toggle('drawerOpen', !!name);
+    document.querySelectorAll('.nav[data-panel]').forEach(b => { if (b.dataset.panel === name) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+    if (name) $('drawerTitle').textContent = PANEL_TITLE[name] || '';
+    if (name === 'compose') setTimeout(() => $('tTitle').focus(), 50);
+    if (name === 'projects') loadSessions();
+    if (window.innerWidth <= 900) document.body.classList.remove('menuOpen');
+  }
+  document.querySelectorAll('.nav[data-panel]').forEach(b => b.addEventListener('click', () => openPanel(panel === b.dataset.panel ? null : b.dataset.panel)));
+  $('drawerClose').onclick = () => openPanel(null);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel && !$('taskDlg').open) openPanel(null); });
+  $('menuBtn').onclick = () => { const on = document.body.classList.toggle('menuOpen'); $('menuBtn').setAttribute('aria-expanded', String(on)); };
+  $('team').addEventListener('click', () => { if (window.innerWidth <= 900) openPanel(null); });
 
   // ---------- renderers ----------
   function renderAuth() {
@@ -27,20 +47,27 @@
   }
   function renderSpend() {
     $('spend').textContent = '$' + S.spend.usd.toFixed(2);
-    $('spendLimit').textContent = `/ $${S.spend.limit.toFixed(2)} ຕໍ່ມື້`;
+    $('spendLimit').textContent = `ເພດານ $${S.spend.limit.toFixed(2)} ຕໍ່ມື້`;
     $('spendBar').style.width = Math.min(100, S.spend.usd / (S.spend.limit || 1) * 100) + '%';
+  }
+  function renderCounts() {
+    setCount($('apCount'), S.approvals.length);
+    setCount($('taskCount'), S.tasks.filter(t => ['queued', 'running', 'waiting'].includes(t.status)).length);
+    setCount($('busyCount'), S.agents.filter(a => ['working', 'waiting', 'meeting'].includes(a.status)).length);
+    $('teamCount').textContent = `ທີມ ${S.agents.length} ຄົນ`;
   }
   function renderTasks() {
     const box = $('tasks');
-    if (!S.tasks.length) { box.innerHTML = '<p class="empty">ຍັງບໍ່ມີວຽກ. ພິມວຽກໃນກ່ອງລຸ່ມສຸດ ແລ້ວກົດ "ສົ່ງວຽກ".</p>'; return; }
-    box.innerHTML = S.tasks.slice(0, 30).map(t => {
+    if (!S.tasks.length) box.innerHTML = '<p class="empty">ຍັງບໍ່ມີວຽກ. ກົດ "ສັ່ງວຽກໃໝ່" ເພື່ອເລີ່ມ.</p>';
+    else box.innerHTML = S.tasks.slice(0, 50).map(t => {
       const a = agent(t.assignee), proj = t.cwd ? t.cwd.split('/').pop() : '';
       const who = t.mode === 'team' ? `👥 ທີມ (ນຳໂດຍ ${a?.name || t.assignee})` : `👤 ${a ? a.name + ' · ' + a.role : t.assignee}`;
       return `<button type="button" class="task" data-id="${t.id}"><div class="top"><b>${esc(t.title)}</b><span class="st ${t.status}">${STATUS_TEXT[t.status] || t.status}</span></div><small>${esc(who)} · 📁 ${esc(proj)}${t.costUsd ? ` · $${t.costUsd.toFixed(3)}` : ''}</small></button>`;
     }).join('');
+    renderCounts();
   }
   function renderApprovals() {
-    $('approvalBox').hidden = !S.approvals.length; $('apCount').textContent = S.approvals.length || '';
+    $('apEmpty').hidden = !!S.approvals.length;
     $('approvals').innerHTML = S.approvals.map(ap => {
       const a = agent(ap.agent), t = S.tasks.find(x => x.id === ap.taskId);
       if (ap.kind === 'plan') {
@@ -49,29 +76,41 @@
       const detail = ap.input?.command || ap.input?.file_path || JSON.stringify(ap.input || {}).slice(0, 300);
       return `<div class="approval"><p><b>${esc(a?.name || ap.agent)}</b> ຂໍ: ${esc(ap.summary)}${t ? `<br><small>ວຽກ: ${esc(t.title)}</small>` : ''}</p><code>${esc(detail)}</code><div class="btns"><button type="button" class="btn yes" data-ap="${ap.id}" data-allow="1">ອະນຸຍາດ</button><button type="button" class="btn no" data-ap="${ap.id}" data-allow="0">ບໍ່ອະນຸຍາດ</button></div></div>`;
     }).join('');
+    renderCounts();
   }
   function renderAssignees() {
     const sel = $('tAssignee'), cur = sel.value;
     sel.innerHTML = S.agents.map(a => `<option value="${a.key}">${esc(a.name)} · ${esc(a.role)}</option>`).join('');
     if (cur) sel.value = cur;
-    const lead = agent(S.lead);
-    $('teamHint').textContent = lead ? `${lead.name} (${lead.role}) ວາງແຜນ${S.superpowers ? ' ດ້ວຍ Superpowers' : ''} ແລ້ວແຈກວຽກໃຫ້ທີມ` : '';
   }
-  function renderMode() { const team = mode() === 'team'; $('tAssignee').hidden = team; $('teamHint').hidden = !team; }
+  function renderMode() {
+    const team = mode() === 'team', lead = agent(S.lead);
+    $('tAssignee').hidden = team; $('tAssigneeLabel').hidden = team;
+    $('teamHint').textContent = team ? (lead ? `${lead.name} (${lead.role}) ວາງແຜນ${S.superpowers ? ' ດ້ວຍ Superpowers' : ''} → ເຈົ້າອະນຸມັດ → ແຈກວຽກໃຫ້ທີມຕາມບົດບາດ` : '') : 'ມອບວຽກນ້ອຍໃຫ້ຄົນທີ່ເລືອກໂດຍກົງ';
+  }
   function renderProjects() {
-    const sel = $('tProject'), cur = sel.value;
-    sel.innerHTML = S.projects.map(p => `<option value="${esc(p.path)}">📁 ${esc(p.name)} — ${esc(p.path)}</option>`).join('');
-    sel.value = S.projects.some(p => p.path === cur) ? cur : (S.projects[0]?.path || '');
+    if (!S.projects.some(p => p.path === S.project)) S.project = S.projects[0]?.path || '';
+    $('tProject').innerHTML = S.projects.map(p => `<option value="${esc(p.path)}">📁 ${esc(p.name)}</option>`).join('');
+    $('tProject').value = S.project;
+    $('projectList').innerHTML = S.projects.map(p => `<button type="button" class="proj" data-path="${esc(p.path)}" ${p.path === S.project ? 'aria-current="true"' : ''}><b>📁 ${esc(p.name)}</b><small>${esc(p.path)}</small></button>`).join('');
   }
   function renderSessions() {
     const sel = $('tSession'), cur = sel.value;
-    sel.innerHTML = '<option value="">✨ Session ໃໝ່</option>' + S.sessions.map(s => `<option value="${s.id}">↩︎ ${esc(s.title.slice(0, 60))} · ${new Date(s.updatedAt).toLocaleDateString()}</option>`).join('');
+    sel.innerHTML = '<option value="">✨ Session ໃໝ່</option>' + S.sessions.map(s => `<option value="${s.id}">↩︎ ${esc(s.title.slice(0, 50))}</option>`).join('');
     sel.value = S.sessions.some(s => s.id === cur) ? cur : '';
+    $('sessionList').innerHTML = S.sessions.length ? S.sessions.map(s => `<div class="sess"><b>${esc(s.title)}</b><small>${new Date(s.updatedAt).toLocaleString()}${s.branch ? ' · 🌿 ' + esc(s.branch) : ''}</small><div class="btnRow"><button type="button" class="iconBtn" data-resume="${s.id}" data-mode="team">↩︎ ສືບຕໍ່ (ທີມ)</button><button type="button" class="iconBtn" data-resume="${s.id}" data-mode="single">↩︎ ສືບຕໍ່ (ຄົນດຽວ)</button></div></div>`).join('') : '<p class="empty">ໂຟນເດີນີ້ຍັງບໍ່ມີ session ຂອງ Claude Code.</p>';
   }
   async function loadSessions() {
-    const dir = $('tProject').value; if (!dir) return;
-    try { S.sessions = await api('/api/sessions?dir=' + encodeURIComponent(dir)); } catch { S.sessions = []; }
+    if (!S.project) return;
+    try { S.sessions = await api('/api/sessions?dir=' + encodeURIComponent(S.project)); } catch { S.sessions = []; }
     renderSessions();
+  }
+  function setProject(p) { S.project = p; renderProjects(); loadSessions(); }
+  function prefillResume(sessionId, m, assignee) {
+    document.querySelector(`input[name="mode"][value="${m}"]`).checked = true; renderMode();
+    if (assignee) $('tAssignee').value = assignee;
+    if (![...$('tSession').options].some(o => o.value === sessionId)) $('tSession').insertAdjacentHTML('beforeend', `<option value="${sessionId}">↩︎ session ${sessionId.slice(0, 8)}</option>`);
+    $('tSession').value = sessionId; openPanel('compose'); say('ພິມສິ່ງທີ່ຢາກໃຫ້ເຮັດຕໍ່ ແລ້ວກົດ ສົ່ງວຽກ');
   }
   let selectedKey = null;
   function renderCard() {
@@ -99,32 +138,29 @@
   $('tasks').addEventListener('click', e => { const b = e.target.closest('.task'); if (!b) return; openTaskId = b.dataset.id; renderDialog(); $('taskDlg').showModal(); });
   $('dStop').onclick = async () => { try { await api(`/api/tasks/${openTaskId}/stop`, { method: 'POST' }); } catch (err) { say(err.message); } };
   $('dOpen').onclick = async () => { const t = S.tasks.find(x => x.id === openTaskId); try { await api('/api/projects/open', { method: 'POST', body: { path: t.cwd, editor: 'antigravity' } }); } catch (err) { say(err.message); } };
-  $('dContinue').onclick = async () => {
+  $('dContinue').onclick = () => {
     const t = S.tasks.find(x => x.id === openTaskId); if (!t) return;
-    $('taskDlg').close();
-    document.querySelector(`input[name="mode"][value="${t.mode === 'team' ? 'team' : 'single'}"]`).checked = true; renderMode();
-    if (t.mode !== 'team') $('tAssignee').value = t.assignee;
-    $('tProject').value = t.cwd; await loadSessions();
-    if (![...$('tSession').options].some(o => o.value === t.sessionId)) $('tSession').insertAdjacentHTML('beforeend', `<option value="${t.sessionId}">↩︎ ${esc(t.title.slice(0, 60))}</option>`);
-    $('tSession').value = t.sessionId; $('tTitle').focus(); say('ພິມສິ່ງທີ່ຢາກໃຫ້ເຮັດຕໍ່ ແລ້ວກົດ ສົ່ງວຽກ');
+    $('taskDlg').close(); setProject(t.cwd);
+    prefillResume(t.sessionId, t.mode === 'team' ? 'team' : 'single', t.mode === 'team' ? null : t.assignee);
   };
 
   // ---------- actions ----------
   $('authRecheck').onclick = async () => { S.auth = { mode: 'checking' }; renderAuth(); try { S.auth = await api('/api/auth/recheck', { method: 'POST' }); } catch (err) { say(err.message); } renderAuth(); };
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', renderMode));
-  $('tProject').onchange = loadSessions;
+  $('tProject').onchange = () => setProject($('tProject').value);
+  $('projectList').addEventListener('click', e => { const b = e.target.closest('.proj'); if (b) setProject(b.dataset.path); });
+  $('sessionList').addEventListener('click', e => { const b = e.target.closest('[data-resume]'); if (b) prefillResume(b.dataset.resume, b.dataset.mode); });
   $('pAdd').onclick = async () => {
-    say('ເລືອກໂຟນເດີໃນໜ້າຕ່າງທີ່ເປີດຂຶ້ນມາ…');
-    try { const p = await api('/api/projects/pick', { method: 'POST' }); if (p.cancelled) return say(''); S.projects = await api('/api/projects'); renderProjects(); $('tProject').value = p.path; say(`ເພີ່ມໂຟນເດີ ${p.name} ແລ້ວ`); loadSessions(); }
-    catch (err) { say(err.message); }
+    try { const p = await api('/api/projects/pick', { method: 'POST' }); if (p.cancelled) return; S.projects = await api('/api/projects'); setProject(p.path); }
+    catch (err) { alert(err.message); }
   };
-  $('pOpen').onclick = async () => { try { await api('/api/projects/open', { method: 'POST', body: { path: $('tProject').value, editor: 'antigravity' } }); say('ເປີດໂຟນເດີໃນ Antigravity ແລ້ວ'); } catch (err) { say('ເປີດບໍ່ໄດ້: ' + err.message); } };
+  $('pOpen').onclick = async () => { try { await api('/api/projects/open', { method: 'POST', body: { path: S.project, editor: 'antigravity' } }); } catch (err) { alert('ເປີດບໍ່ໄດ້: ' + err.message); } };
   $('approvals').addEventListener('click', async e => {
     const b = e.target.closest('[data-ap]'); if (!b) return;
     b.disabled = true;
     const feedback = $('fb-' + b.dataset.ap)?.value || '';
     try { await api(`/api/approvals/${b.dataset.ap}`, { method: 'POST', body: { allow: b.dataset.allow === '1', feedback } }); }
-    catch (err) { say(err.message); }
+    catch (err) { alert(err.message); }
   });
   $('compose').addEventListener('submit', async e => {
     e.preventDefault();
@@ -132,7 +168,7 @@
     const m = mode();
     $('tSend').disabled = true; say('ກຳລັງສົ່ງວຽກ…');
     try {
-      const t = await api('/api/tasks', { method: 'POST', body: { title, detail: $('tDetail').value, mode: m, assignee: $('tAssignee').value, cwd: $('tProject').value, resume: $('tSession').value || null } });
+      const t = await api('/api/tasks', { method: 'POST', body: { title, detail: $('tDetail').value, mode: m, assignee: $('tAssignee').value, cwd: S.project, resume: $('tSession').value || null } });
       const a = agent(t.assignee);
       say(m === 'team' ? `ສົ່ງໃຫ້ທີມແລ້ວ: ${a?.name} ກຳລັງວາງແຜນ` : `ສົ່ງວຽກໃຫ້ ${a?.name} ແລ້ວ`);
       $('tTitle').value = ''; $('tDetail').value = ''; $('tSession').value = '';
@@ -141,12 +177,12 @@
     finally { $('tSend').disabled = false; }
   });
   async function saveAgent(patch) {
-    try { const a = await api(`/api/agents/${selectedKey}`, { method: 'PATCH', body: patch }); Object.assign(agent(selectedKey), a); syncPerson(selectedKey); say(`ບັນທຶກແລ້ວ: ${a.name} ໃຊ້ ${a.model} (${EFFORT_TEXT[a.effort]})`); }
-    catch (err) { say(err.message); renderCard(); }
+    try { const a = await api(`/api/agents/${selectedKey}`, { method: 'PATCH', body: patch }); Object.assign(agent(selectedKey), a); syncPerson(selectedKey); }
+    catch (err) { alert(err.message); renderCard(); }
   }
   $('cModel').onchange = () => saveAgent({ model: $('cModel').value });
   $('cEffort').onchange = () => saveAgent({ effort: $('cEffort').value });
-  $('cAssign').onclick = () => { document.querySelector('input[name="mode"][value="single"]').checked = true; renderMode(); $('tAssignee').value = selectedKey; $('tTitle').focus(); };
+  $('cAssign').onclick = () => { document.querySelector('input[name="mode"][value="single"]').checked = true; renderMode(); $('tAssignee').value = selectedKey; openPanel('compose'); };
 
   function syncPerson(key) {
     const a = agent(key); if (!a) return;
@@ -163,23 +199,24 @@
     try { st = await api('/api/state'); } catch (err) { $('authText').textContent = 'ເຊື່ອມຕໍ່ server ບໍ່ໄດ້'; return; }
     Object.assign(S, st);
     S.agents.forEach(a => syncPerson(a.key));
-    renderAuth(); renderAssignees(); renderMode(); renderProjects(); renderTasks(); renderApprovals(); renderSpend();
+    renderAuth(); renderAssignees(); renderMode(); renderProjects(); renderTasks(); renderApprovals(); renderSpend(); renderCounts();
     loadSessions();
+    if (S.approvals.length) openPanel('approvals');
 
     const es = new EventSource('/api/events');
     es.onmessage = m => {
       const ev = JSON.parse(m.data);
-      if (ev.type === 'agent') { const a = agent(ev.key); if (a) { Object.assign(a, { status: ev.status, activity: ev.activity, taskId: ev.taskId }); window.OFFICE.setLive(ev.key, a); if (ev.key === selectedKey) renderCard(); } }
+      if (ev.type === 'agent') { const a = agent(ev.key); if (a) { Object.assign(a, { status: ev.status, activity: ev.activity, taskId: ev.taskId }); window.OFFICE.setLive(ev.key, a); if (ev.key === selectedKey) renderCard(); renderCounts(); } }
       else if (ev.type === 'agentConfig') { const a = agent(ev.key); if (a) { a.model = ev.model; a.effort = ev.effort; syncPerson(ev.key); if (ev.key === selectedKey) renderCard(); } }
-      else if (ev.type === 'task') { upsertTask(ev.task); if (ev.task.status === 'done' || ev.task.status === 'failed') loadSessions(); }
+      else if (ev.type === 'task') { upsertTask(ev.task); if (['done', 'failed'].includes(ev.task.status) && ev.task.cwd === S.project) loadSessions(); }
       else if (ev.type === 'log') { const t = S.tasks.find(x => x.id === ev.taskId); if (t) { t.log = [...(t.log || []), ev.entry].slice(-80); if (openTaskId === t.id) renderDialog(); } }
-      else if (ev.type === 'approval') { S.approvals.push(ev.approval); renderApprovals(); window.OFFICE.focus(ev.approval.agent); }
+      else if (ev.type === 'approval') { S.approvals.push(ev.approval); renderApprovals(); openPanel('approvals'); window.OFFICE.focus(ev.approval.agent); }
       else if (ev.type === 'approvalDone') { S.approvals = S.approvals.filter(a => a.id !== ev.id); renderApprovals(); }
       else if (ev.type === 'spend') { S.spend.usd = ev.usd; S.spend.limit = ev.limit; renderSpend(); }
       else if (ev.type === 'auth') { S.auth = ev.auth; renderAuth(); }
       else if (ev.type === 'projects') { S.projects = ev.projects; renderProjects(); }
     };
-    es.onerror = () => { $('authText').textContent = 'ຂາດການເຊື່ອມຕໍ່ server · ກຳລັງລອງໃໝ່…'; };
+    es.onerror = () => { $('authText').textContent = 'ຂາດການເຊື່ອມຕໍ່ server…'; };
     es.onopen = () => renderAuth();
   })();
 })();
