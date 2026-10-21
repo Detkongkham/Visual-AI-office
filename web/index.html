@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ຫ້ອງການ AI Dev</title>
+<script src="theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -16,6 +17,7 @@
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></symbol>
   <symbol id="i-map" viewBox="0 0 24 24"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
   <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
   <symbol id="i-fit" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></symbol>
@@ -23,6 +25,9 @@
   <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
 </svg>
 
@@ -53,14 +58,12 @@
     </div>
     <div class="group">
       <p class="gTitle">ຫ້ອງການ</p>
+      <button type="button" class="nav" data-panel="staff"><svg><use href="#i-users"/></svg><span>ພະນັກງານ</span></button>
       <button type="button" class="nav" data-panel="rooms"><svg><use href="#i-map"/></svg><span>ຫ້ອງ</span></button>
     </div>
     <div class="group">
-      <p class="gTitle">ມຸມມອງ</p>
-      <button type="button" class="nav" id="bFit"><svg><use href="#i-fit"/></svg><span>ເບິ່ງທັງໝົດ</span></button>
-      <button type="button" class="nav" id="bFollow" aria-pressed="false"><svg><use href="#i-target"/></svg><span>ຕິດຕາມຄົນທີ່ເລືອກ</span></button>
-      <div class="zoomRow"><button type="button" id="bOut" aria-label="ຊູມອອກ">－</button><span>ຊູມ</span><button type="button" id="bIn" aria-label="ຊູມເຂົ້າ">＋</button></div>
-      <button type="button" id="bFast" aria-pressed="false" hidden>×3</button>
+      <p class="gTitle">ລະບົບ</p>
+      <button type="button" class="nav" data-panel="settings"><svg><use href="#i-gear"/></svg><span>ການຕັ້ງຄ່າ</span></button>
     </div>
   </nav>
 
@@ -80,7 +83,19 @@
 </aside>
 <button type="button" class="rToggle" id="rToggle" aria-controls="rpanel" aria-expanded="false">ທີມ ແລະ ຂີດຈຳກັດ</button>
 
-<div id="stage"><canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas></div>
+<div id="stage">
+  <canvas id="cv" aria-label="ແຜນຜັງຫ້ອງການ AI"></canvas>
+  <!-- view controls float over the map -->
+  <div class="viewBar" role="toolbar" aria-label="ມຸມມອງ">
+    <button type="button" class="vb" id="bTheme" title="ປ່ຽນໂໝດສີ"><svg><use href="#i-monitor"/></svg><span id="themeText">ອັດຕະໂນມັດ</span></button>
+    <i class="vSep" aria-hidden="true"></i>
+    <button type="button" class="vb" id="bFit" title="ເບິ່ງຫ້ອງການທັງໝົດ"><svg><use href="#i-fit"/></svg><span>ທັງໝົດ</span></button>
+    <button type="button" class="vb" id="bFollow" aria-pressed="false" title="ກ້ອງຕິດຕາມຄົນທີ່ເລືອກ"><svg><use href="#i-target"/></svg><span>ຕິດຕາມ</span></button>
+    <i class="vSep" aria-hidden="true"></i>
+    <div class="vZoom"><button type="button" class="vb sq" id="bOut" aria-label="ຊູມອອກ" title="ຊູມອອກ">－</button><button type="button" class="vb sq" id="bIn" aria-label="ຊູມເຂົ້າ" title="ຊູມເຂົ້າ">＋</button></div>
+    <button type="button" class="vb sq" id="bFast" aria-pressed="false" hidden>×3</button>
+  </div>
+</div>
 
 <!-- slide-out panel next to the sidebar -->
 <section class="drawer" id="drawer" hidden aria-labelledby="drawerTitle">
@@ -96,19 +111,24 @@
       <label class="fl" for="tAssignee" id="tAssigneeLabel">ມອບໃຫ້</label>
       <select id="tAssignee"></select>
       <label class="fl" for="tProject">ໂປຣເຈັກ</label>
-      <select id="tProject"></select>
+      <div class="row2"><select id="tProject"></select><button type="button" class="iconBtn" id="tFind" title="ຄົ້ນຫາໂຟນເດີໃນເຄື່ອງ">🔍</button></div>
+      <p class="folderWarn" id="tProjectWarn" hidden></p>
       <label class="fl" for="tSession">Session</label>
       <select id="tSession"></select>
+      <p class="hint" id="tSessionHint" hidden></p>
       <label class="fl" for="tTitle">ວຽກ</label>
       <input id="tTitle" name="title" placeholder="ເຊັ່ນ: ສ້າງໜ້າ login ດ້ວຍ HTML" maxlength="200" required>
       <label class="fl" for="tDetail">ລາຍລະອຽດ (ບໍ່ບັງຄັບ)</label>
       <textarea id="tDetail" name="detail" rows="5"></textarea>
+      <label class="autoChk"><input type="checkbox" id="tAuto"> <span>⚡ ອະນຸຍາດຄຳສັ່ງອັດຕະໂນມັດ (ບໍ່ຕ້ອງກົດອະນຸຍາດທຸກເທື່ອ)</span></label>
+      <p class="hint">ແຜນງານຍັງຕ້ອງອະນຸມັດເອງ</p>
       <button type="submit" class="primary wide" id="tSend">ສົ່ງວຽກ</button>
       <p class="formMsg" id="formMsg" role="status"></p>
     </form>
   </div>
 
   <div class="pane" data-pane="approvals">
+    <div class="autoBar" id="autoBar"></div>
     <div class="list" id="approvals"></div>
     <p class="empty" id="apEmpty">ບໍ່ມີຫຍັງລໍຖ້າເຈົ້າ.</p>
   </div>
@@ -129,8 +149,21 @@
       <button type="button" class="iconBtn" id="pAdd">＋ ເພີ່ມໂຟນເດີ</button>
       <button type="button" class="iconBtn" id="pOpen">📂 ເປີດໃນ Antigravity</button>
     </div>
+    <h3 class="sub">ຄົ້ນຫາໂຟນເດີໃນເຄື່ອງ</h3>
+    <input type="search" id="fSearch" placeholder="🔍 ພິມຊື່ໂຟນເດີ ເຊັ່ນ vao, ai-office" autocomplete="off">
+    <div class="fBar" id="fBar"></div>
+    <div class="list fList" id="fList"></div>
     <h3 class="sub">Session ຂອງໂປຣເຈັກທີ່ເລືອກ</h3>
     <div class="list" id="sessionList"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
+  </div>
+
+  <div class="pane" data-pane="settings">
+    <p class="hint">ບັນທຶກອັດຕະໂນມັດ ແລະ ມີຜົນກັບວຽກຕໍ່ໄປທັນທີ (ບໍ່ຕ້ອງ restart).</p>
+    <div id="settingsBox"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
+  </div>
+
+  <div class="pane" data-pane="staff">
+    <div id="staffBox"><p class="empty">ກຳລັງໂຫຼດ…</p></div>
   </div>
 
   <div class="pane" data-pane="rooms">
@@ -152,7 +185,7 @@
       <select id="cEffort"></select>
     </div>
     <p class="access" id="cAccess"></p>
-    <button type="button" class="primary" id="cAssign">ສົ່ງວຽກໃຫ້ຄົນນີ້</button>
+    <div class="btnRow"><button type="button" class="primary" id="cAssign">ສົ່ງວຽກໃຫ້ຄົນນີ້</button><button type="button" class="iconBtn" id="cEdit">✏️ ແກ້ໄຂ / ໜ້າຕາ</button></div>
   </div>
 </div>
 
@@ -169,13 +202,16 @@
   <form class="chatComposer" id="chatForm" autocomplete="off">
     <textarea id="chatInput" rows="1" placeholder="ພິມຂໍ້ຄວາມເພື່ອເຮັດຕໍ່ໃນການສົນທະນານີ້…"></textarea>
     <button type="submit" class="primary" id="chatSend" aria-label="ສົ່ງ"><svg><use href="#i-send"/></svg></button>
+    <button type="button" class="autoSw chatAutoSw" id="chatAuto" role="switch" aria-checked="false"><span class="knob" aria-hidden="true"></span><span>⚡ ອະນຸຍາດອັດຕະໂນມັດ:</span><span class="state" id="chatAutoState">ປິດ</span></button>
     <p class="chatNote" id="chatNote"></p>
   </form>
 </section>
 
 <script src="assets/atlas.js"></script>
 <script src="assets/rooms.js"></script>
+<script src="tint.js"></script>
 <script src="office.js"></script>
 <script src="app.js"></script>
+<script src="staff.js"></script>
 </body>
 </html>

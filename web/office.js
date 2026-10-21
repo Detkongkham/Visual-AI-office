@@ -56,18 +56,20 @@
   Object.values(RCOL).forEach(c => { c.edge = '#8f7cb0'; c.edge2 = '#7d6a9e'; });
   // ---------- images ----------
   const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(im); im.src = src; });
-  const RIM = {}, PIM = {}, IMG = {};
+  const RIM = {}, PIM = {}, IMG = {}, MASK = {}; // MASK = saved shirt masks (web/assets/shirts, made with mask-editor.html)
   await Promise.all([
     ...Object.keys(ROOMIMG).map(async k => RIM[k] = await loadImg(ROOMIMG[k].img)),
     ...Object.keys(PROPIMG).map(async k => PIM[k] = await loadImg(PROPIMG[k].img)),
     ...Object.keys(ATLAS).map(async k => IMG[k] = await loadImg(ATLAS[k].img)),
+    ...Object.keys(ATLAS).map(async k => MASK[k] = await loadImg(`assets/shirts/${k}.png`)),
   ]);
 
   // ---------- drawables ----------
   // every drawable has a footprint rect so the painter can tell what is in front
   const STATIC = [];
   ROOMS.forEach(r => STATIC.push({ kind: 'room', r, x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z1, draw: () => drawRoom(r) }));
-  function prop(name, x, z, scale = 1, fpx, fpz, lift = 0) { const fp = 0.35 * scale; fpx = fpx || fp; fpz = fpz || fp; const fp2 = fpx; STATIC.push({ kind: 'prop', x0: x - fpx, z0: z - fpz, x1: x + fpx, z1: z + fpz, draw: () => drawProp(name, x, z, scale, lift) }); BLOCK.push([x - fpx, z - fpz, x + fpx, z + fpz]); }
+  // a prop with a seat key is a ghost desk: it turns into a real desk once someone sits there
+  function prop(name, x, z, scale = 1, fpx, fpz, lift = 0, seat = null) { const fp = 0.35 * scale; fpx = fpx || fp; fpz = fpz || fp; STATIC.push({ kind: 'prop', x0: x - fpx, z0: z - fpz, x1: x + fpx, z1: z + fpz, draw: () => drawProp(seat && seatOwner(seat) ? 'desk3' : name, x, z, scale, lift) }); BLOCK.push([x - fpx, z - fpz, x + fpx, z + fpz]); }
   const BLOCK = [];
   // corridor decoration
   const cx = i => i * (S + G) - G / 2, cz = j => j * (S + G) - G / 2;
@@ -76,7 +78,7 @@
   // plaza in the empty tile: trees + tree house
   prop('tree', PLAZA.x0 + 1.6, PLAZA.z0 + 1.4, 1.2); prop('treehouse', PLAZA.x0 + 6.0, PLAZA.z0 + 1.6, 1.1); prop('tree', PLAZA.x0 + 1.5, PLAZA.z0 + 6.2, 1.1); prop('tree', PLAZA.x0 + 6.4, PLAZA.z0 + 6.4, 1.0); prop('monstera', PLAZA.x0 + 4.0, PLAZA.z0 + 6.8, 0.9); prop('lamp', PLAZA.x0 + 4.2, PLAZA.z0 + 3.6, 0.9);
   // furniture in each room's new floor space (local coords inside the room; picture covers 0..5)
-  const EXTRA_SEATS = [];
+  const FUTURE_SEATS = {}; // seat key -> world point, one per ghost desk in the expansion rooms
   // [name, lx, lz, seatKind, scale, lift]; picture covers local 0..5, the new space is x 5..8 or z 5..8
   const D = (x, z, kind = 'seat', n = 'desk2') => [[n, x, z, kind], ['chair', x + 0.85, z + 0.15]];
   const EXT = {
@@ -97,11 +99,13 @@
   const RUGS_BY_ID = {};
   ROOMS.forEach(r => { if (RUGS[r.img]) RUGS_BY_ID[r.id] = RUGS[r.img].map(([x, z, sc]) => [r.x0 + x, r.z0 + z, sc]); });
   Object.keys(RUGS).forEach(k => delete RUGS[k]); Object.assign(RUGS, RUGS_BY_ID);
-  ROOMS.forEach(r => (EXT[r.img] || []).forEach(([name, lx, lz, kind, sc, lift]) => {
+  ROOMS.forEach(r => { let n = 0; (EXT[r.img] || []).forEach(([name, lx, lz, kind, sc, lift]) => {
     const x = r.x0 + lx, z = r.z0 + lz, f = FOOT[name];
-    prop(name, x, z, sc || 1, f ? f[0] : null, f ? f[1] : null, lift || 0);
-    if (kind) EXTRA_SEATS.push({ k: 'x' + r.id + lx + lz, used: false });
-  }));
+    // ghost desks in the two expansion rooms are open seats futA1..5 / futB1..5 (keep in step with server/team.js SEATS)
+    const seat = kind === 'open' ? `fut${r.id === 'future' ? 'A' : 'B'}${++n}` : null;
+    prop(name, x, z, sc || 1, f ? f[0] : null, f ? f[1] : null, lift || 0, seat);
+    if (seat) FUTURE_SEATS[seat] = { x: x + 0.9, z: z + 0.1, room: r.id };
+  }); });
 
   function affineDraw(im, srcPts, dstPts) {
     // map three source pixel points to three screen points
@@ -182,13 +186,13 @@
     future1: roomPt('future', 475, 482), future2: roomPt('future2', 475, 482),
     plaza: { x: PLAZA.x0 + 2.4, z: PLAZA.z0 + 3.4 },
     labHolo: { x: RID.lab.x0 + 5.5, z: RID.lab.z0 + 4.7 },
+    ...FUTURE_SEATS,
   };
-  // seats: occupied + open (the future room's ghost desks and empty chairs count as open seats)
-  const SEATS = [
-    ...['ceoSeat', 'baSeat1', 'baSeat2', 'labSeat1', 'labSeat2', 'labSeat3', 'qaSeat', 'opsSeat1', 'opsSeat2', 'dev1', 'dev2', 'dev3', 'dev4', 'devB1', 'devB2', 'devB3', 'devB4', 'devC1', 'devC2', 'devC3', 'devC4'].map(k => ({ k, used: false })),
-    ...Array.from({ length: 16 }, (_, i) => ({ k: 'ghost' + i, used: false })),
-    ...EXTRA_SEATS,
-  ];
+  // desks a person can be given (same list as server/team.js SEATS)
+  const SEATS = ['ceoSeat', 'baSeat1', 'baSeat2', 'labSeat1', 'labSeat2', 'labSeat3', 'qaSeat', 'opsSeat1', 'opsSeat2', 'dev1', 'dev2', 'dev3', 'dev4', 'devB1', 'devB2', 'devB3', 'devB4', 'devC1', 'devC2', 'devC3', 'devC4', ...Object.keys(FUTURE_SEATS)];
+  const seatOwner = k => PEOPLE.find(p => p.home === k);
+  // "Dev Workspace B · ໂຕະ 2": room name plus the desk's number inside that room
+  const seatLabel = k => { const r = RID[SP[k]?.room]; if (!r) return k; const same = SEATS.filter(s => SP[s].room === r.id); return `${r.ico} ${r.name} · ໂຕະ ${same.indexOf(k) + 1}`; };
 
   // ---------- walk grid ----------
   const CS = 0.25, GW = Math.ceil((X1 - X0) / CS), GH = Math.ceil((Z1 - Z0) / CS);
@@ -229,34 +233,51 @@
   }
 
   // ---------- people ----------
-  const PEOPLE = [
-    { key: 'ceo', name: 'ເຈົ້າ', role: 'CEO · ຜູ້ອະນຸມັດ', model: 'Opus 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 7], actStand: true, home: 'ceoSeat', spot: ['core1', 'ອະນຸມັດວຽກທີ່ AI Core'] },
-    { key: 'manee', name: 'ມະນີ', role: 'Business Analyst', model: 'Opus 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: true, home: 'baSeat1', spot: ['baBoard', 'ນຳສະເໜີ requirement ທີ່ກະດານ'] },
-    { key: 'somphone', name: 'ສົມພອນ', role: 'Tech Lead', model: 'Opus 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: true, home: 'labSeat1', spot: ['labAct', 'ອະທິບາຍ architecture'] },
-    { key: 'dao', name: 'ດາວ', role: 'Frontend Developer', model: 'Sonnet 5.5', down: ['R', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 4], actStand: true, home: 'dev1', spot: ['core2', 'ກວດໜ້າ UI ໃນ hologram'] },
-    { key: 'bounmy', name: 'ບຸນມີ', role: 'Backend Developer', model: 'Sonnet 5.5', down: ['R', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 7], actStand: false, home: 'dev2', spot: null },
-    { key: 'keo', name: 'ແກ້ວ', role: 'Code Reviewer', model: 'Opus 5.5', down: ['L', 0], up: null, sit: [2, 0, 4], act: [2, 4, 8], actStand: true, home: 'devB1', spot: ['cafe2', 'ອ່ານ code ພ້ອມກາເຟ'] },
-    { key: 'noy', name: 'ນ້ອຍ', role: 'UI/UX Designer', model: 'Sonnet 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: false, home: 'devB2', spot: null },
-    { key: 'phone', name: 'ພອນ', role: 'Mobile Developer', model: 'Sonnet 5.5', down: ['L', 0], up: null, sit: [2, 0, 4], act: [2, 4, 8], actStand: true, home: 'devC1', spot: ['lounge2', 'ທົດສອບແອັບໃນມືຖື'] },
-    { key: 'toy', name: 'ຕ້ອຍ', role: 'QA Engineer', model: 'Sonnet 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [3, 0, 4], actStand: true, home: 'qaSeat', spot: ['qaHolo', 'ກວດຜົນເທສໃນ hologram'] },
-    { key: 'kham', name: 'ຄຳ', role: 'DevOps Engineer', model: 'Haiku 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 6], actStand: false, home: 'opsSeat1', spot: null },
-    { key: 'sy', name: 'ສີ', role: 'Security Engineer', model: 'Sonnet 5.5', down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: false, home: 'opsSeat2', spot: null },
-    { key: 'saeng', name: 'ແສງ', role: 'Product Manager', model: 'Opus 5.5', down: ['R', 0], up: null, sit: [2, 0, 3], act: [2, 3, 6], actStand: true, home: 'baSeat2', spot: ['meet1', 'ນຳປະຊຸມ planning ໃນສວນ'] },
-  ];
-  PEOPLE.push(
-    { key: 'vanh', name: 'ວັນ', role: 'AI / Data Engineer', model: 'Opus 5.5', down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true, home: 'labSeat3', spot: ['labHolo', 'ວິເຄາະ neural network ໃນ hologram'] },
-    { key: 'thong', name: 'ທອງ', role: 'Technical Writer', model: 'Haiku 5.5', down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true, home: 'devC2', spot: ['lounge1', 'ຂຽນເອກະສານໃນ Lounge'] },
-    { key: 'chanh', name: 'ຈັນ', role: 'Scrum Master', model: 'Sonnet 5.5', down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true, home: 'devC3', spot: ['meet2', 'ນຳ stand-up meeting ໃນສວນ'] },
-  );
+  // how each drawing animates: walk rows face Left/Right, frame slices [row, from, to] for sitting and acting
+  const SPRITES = {
+    ceo: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 7], actStand: true },
+    manee: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: true },
+    somphone: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: true },
+    dao: { down: ['R', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 4], actStand: true },
+    bounmy: { down: ['R', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 7], actStand: false },
+    keo: { down: ['L', 0], up: null, sit: [2, 0, 4], act: [2, 4, 8], actStand: true },
+    noy: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: false },
+    phone: { down: ['L', 0], up: null, sit: [2, 0, 4], act: [2, 4, 8], actStand: true },
+    toy: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [3, 0, 4], actStand: true },
+    kham: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 3], act: [2, 3, 6], actStand: false },
+    sy: { down: ['L', 0], up: ['L', 1], sit: [2, 0, 4], act: [2, 4, 8], actStand: false },
+    saeng: { down: ['R', 0], up: null, sit: [2, 0, 3], act: [2, 3, 6], actStand: true },
+    vanh: { down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true },
+    thong: { down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true },
+    chanh: { down: ['L', 0], up: ['R', 1], sit: [2, 0, 4], act: [3, 0, 5], actStand: true },
+  };
+  // people come from the server's roster (setTeam below), in the roster's order
+  const PEOPLE = [];
   const STATUS = { work: '#ffc93c', review: '#ff8a3d', idle: '#b8b2c4', done: '#3ddc84' };
   const ERRANDS = [['cafe1', 'ໄປເອົາກາເຟ', 'idle'], ['core1', 'ສົ່ງວຽກໃຫ້ AI Core', 'review'], ['meet2', 'ປະຊຸມໃນສວນ', 'work'], ['lounge1', 'ພັກຜ່ອນໃນ Lounge', 'idle'], ['plaza', 'ຍ່າງຮັບລົມໃນສວນ', 'idle'], ['future1', 'ກະກຽມບ່ອນນັ່ງໃຫ້ທີມໃໝ່', 'work'], ['future2', 'ກວດພື້ນທີ່ຂະຫຍາຍ', 'idle']];
   const rnd = (a, b) => a + Math.random() * (b - a);
-  PEOPLE.forEach((p, i) => {
-    const h = SP[p.home]; SEATS.find(s => s.k === p.home).used = true;
-    Object.assign(p, { x: h.x, z: h.z, state: 'sit', timer: rnd(4, 14) + i * 0.6, path: null, pi: 0, frameT: Math.random() * 5, dir: 'down', hface: 'R', status: 'idle', doing: 'ລໍຖ້າວຽກ', hit: null, forced: null, bubble: '' });
-  });
-  const used = SEATS.filter(s => s.used).length;
-  document.getElementById('capAll').textContent = SEATS.length; document.getElementById('capUsed').textContent = used; document.getElementById('capFree').textContent = SEATS.length - used;
+  const modelName = id => { const m = /claude-(\w+)-(\d+)-(\d+)/.exec(id || ''); return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}` : (id || ''); };
+  function renderCapacity() {
+    const used = SEATS.filter(seatOwner).length;
+    document.getElementById('capAll').textContent = SEATS.length; document.getElementById('capUsed').textContent = used; document.getElementById('capFree').textContent = SEATS.length - used;
+  }
+
+  // ---------- shirt colours: the drawing repainted once per (drawing, colour) and kept ----------
+  // the image URL (for CSS avatars) is made only when asked, since encoding is slow; old entries drop out past 80
+  const TINTED = new Map();
+  function sheet(sprite, shirt) {
+    const id = sprite + '|' + (shirt || '');
+    let sh = TINTED.get(id);
+    if (!sh) {
+      const im = IMG[sprite];
+      const cv = shirt && im && im.naturalWidth ? TINT.tintedCanvas(im, ATLAS[sprite].rows, shirt, sprite, MASK[sprite]) : null;
+      let url = cv ? null : ATLAS[sprite].img;
+      sh = { img: cv || im, w: im.naturalWidth, h: im.naturalHeight, get url() { return url ||= cv.toDataURL('image/webp', 0.92); } };
+      TINTED.set(id, sh);
+      if (TINTED.size > 80) TINTED.delete(TINTED.keys().next().value);
+    }
+    return sh;
+  }
 
   function goTo(p, x, z, then) { const path = findPath(p.x, p.z, x, z); if (!path) { then(); return; } p.path = path; p.pi = 1; p.state = 'walk'; p.after = then; }
   const occupied = new Set();
@@ -301,7 +322,7 @@
     p.timer -= dt; if (p.timer <= 0) think(p);
   }
   function framesOf(p) {
-    const rows = ATLAS[p.key].rows, slice = ([r, a, b]) => (rows[r] || rows[0]).slice(a, b);
+    const rows = ATLAS[p.sprite].rows, slice = ([r, a, b]) => (rows[r] || rows[0]).slice(a, b);
     if (p.state === 'sit') return { list: slice(p.sit), fps: 3.5, face: null };
     if (p.state === 'actSit' || p.state === 'actStand') { const l = slice(p.act); return { list: l.length ? l : slice(p.sit), fps: 3, face: null }; }
     const spec = p.dir === 'up' ? (p.up || p.down) : p.down, list = rows[spec[1]];
@@ -310,16 +331,16 @@
   }
   const CH = 2.0; // character height in world metres-ish (screen = CH * u * 1.15)
   function drawPerson(p) {
-    const im = IMG[p.key]; if (!im || !im.naturalWidth) return;
+    const im = sheet(p.sprite, p.shirt).img; if (!im || !(im.naturalWidth || im.width)) return;
     const { list, fps, face } = framesOf(p); const f = list[Math.floor(p.frameT * fps) % list.length]; if (!f) return;
-    const k = (cam.u * CH * 1.15) / ATLAS[p.key].walkH, w = f[2] * k, h = f[3] * k, [sx, sy] = P(p.x, p.z);
+    const k = (cam.u * CH * 1.15) / ATLAS[p.sprite].walkH, w = f[2] * k, h = f[3] * k, [sx, sy] = P(p.x, p.z);
     g.fillStyle = 'rgba(40,30,70,.22)'; g.beginPath(); g.ellipse(sx, sy, cam.u * 0.36, cam.u * 0.17, 0, 0, 7); g.fill();
     g.save(); g.translate(sx, sy + cam.u * 0.04); if (face && face !== p.hface) g.scale(-1, 1); g.drawImage(im, f[0], f[1], f[2], f[3], -w / 2, -h, w, h); g.restore();
     p.hit = [sx - w / 2, sy - h, w, h];
   }
   function drawPersonLabel(p) {
     const [sx, sy] = P(p.x, p.z);
-    if (p.bubble && cam.u > 14) {
+    if (showBubbles && p.bubble && cam.u > 14) {
       const bs = Math.max(10, Math.min(14, cam.u * 0.36)); g.font = `600 ${bs}px "Noto Sans Lao", sans-serif`;
       const txt = p.bubble.length > 34 ? p.bubble.slice(0, 33) + '…' : p.bubble, bw = g.measureText(txt).width + bs * 1.4, by = sy - cam.u * CH * 1.2 - bs * 3.3;
       g.fillStyle = p.forced === 'wait' ? '#fff3e0' : '#ffffff'; g.strokeStyle = p.forced === 'wait' ? '#ff8a3d' : '#6a4fd8'; g.lineWidth = 2;
@@ -329,11 +350,15 @@
     }
     const fs = Math.max(9, Math.min(15, cam.u * 0.42)); g.font = `700 ${fs}px "Noto Sans Lao", sans-serif`;
     const tw = g.measureText(p.name).width + fs * 1.6, ly = sy - cam.u * CH * 1.2 - fs * 0.9;
-    g.fillStyle = p === selected ? '#6a4fd8' : 'rgba(255,255,255,.95)'; g.strokeStyle = '#2a2238'; g.lineWidth = 1.5;
+    const tag = p === selected ? '#6a4fd8' : p.color || null; // the person's own name-tag colour, if they have one
+    g.fillStyle = tag || 'rgba(255,255,255,.95)'; g.strokeStyle = '#2a2238'; g.lineWidth = 1.5;
     g.beginPath(); g.roundRect(sx - tw / 2, ly - fs * 0.8, tw, fs * 1.6, fs * 0.8); g.fill(); g.stroke();
     g.fillStyle = STATUS[p.status]; g.beginPath(); g.arc(sx - tw / 2 + fs * 0.75, ly, fs * 0.32, 0, 7); g.fill(); g.strokeStyle = 'rgba(42,34,56,.6)'; g.lineWidth = 1; g.stroke();
-    g.fillStyle = p === selected ? '#fff' : '#2a2238'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.name, sx + fs * 0.35, ly + 1);
+    g.fillStyle = tag ? inkOn(tag) : '#2a2238'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.name, sx + fs * 0.35, ly + 1);
   }
+
+  // dark text on light tags, white on dark ones
+  const inkOn = c => { const [r, gg, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255); return 0.299 * r + 0.587 * gg + 0.114 * b > 0.6 ? '#2a2238' : '#ffffff'; };
 
   // ---------- painter ordering with footprints ----------
   function behind(a, b) { // is a drawn before b?
@@ -371,41 +396,85 @@
     if (!dragMoved && e.type === 'pointerup') { const hit = PEOPLE.slice().reverse().find(p => p.hit && e.offsetX >= p.hit[0] && e.offsetX <= p.hit[0] + p.hit[2] && e.offsetY >= p.hit[1] && e.offsetY <= p.hit[1] + p.hit[3]); select(hit || null); } };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   const bFollow = document.getElementById('bFollow'), bFast = document.getElementById('bFast');
-  let follow = false, speed = 1;
+  let follow = false, speed = 1, baseSpeed = 1, showBubbles = true; // baseSpeed and showBubbles come from the office settings
   document.getElementById('bFit').onclick = () => { follow = false; bFollow.setAttribute('aria-pressed', 'false'); fit(); };
   document.getElementById('bIn').onclick = () => zoomAt(1.3, W / 2, H / 2);
   document.getElementById('bOut').onclick = () => zoomAt(1 / 1.3, W / 2, H / 2);
   bFollow.onclick = () => { follow = !follow && !!selected; bFollow.setAttribute('aria-pressed', String(follow)); if (follow && cam.u < 60) zoomAt(70 / cam.u, W / 2, H / 2); };
-  bFast.onclick = () => { speed = speed === 1 ? 3 : 1; bFast.setAttribute('aria-pressed', String(speed !== 1)); };
+  bFast.onclick = () => { speed = speed === baseSpeed ? 3 : baseSpeed; bFast.setAttribute('aria-pressed', String(speed !== baseSpeed)); };
   const viewC = () => { const d = document.body.classList.contains('drawerOpen') && W > 760 ? 400 : 0; return [d + (W - d) / 2, H / 2]; };
   function centerOn(x, z, u) { if (u) cam.u = u; const [sx, sy] = P(x, z, 1), [vx, vy] = viewC(); cam.ox += vx - sx; cam.oy += vy - sy; }
 
   // ---------- panel + card ----------
   let selected = null;
   const card = document.getElementById('card');
-  const avaStyle = (key, el, size) => { const a = ATLAS[key], f = a.rows[0][0], s = size / (f[3] * 0.32); el.style.backgroundImage = `url(${a.img})`; el.style.backgroundSize = `${(IMG[key].naturalWidth * s) | 0}px ${(IMG[key].naturalHeight * s) | 0}px`; el.style.backgroundPosition = `${(-(f[0] + f[2] / 2) * s + size / 2) | 0}px ${(-f[1] * s + size * 0.06) | 0}px`; };
+  // head-and-shoulders crop of a drawing; `who` is a person key or a look { sprite, shirt, color }
+  const lookOf = who => typeof who === 'string' ? PEOPLE.find(p => p.key === who) : who;
+  const avaStyle = (who, el, size) => {
+    const l = lookOf(who); if (!l || !ATLAS[l.sprite]) return;
+    const a = ATLAS[l.sprite], f = a.rows[0][0], s = size / (f[3] * 0.32), sh = sheet(l.sprite, l.shirt);
+    el.style.backgroundImage = `url(${sh.url})`; el.style.backgroundSize = `${(sh.w * s) | 0}px ${(sh.h * s) | 0}px`; el.style.backgroundPosition = `${(-(f[0] + f[2] / 2) * s + size / 2) | 0}px ${(-f[1] * s + size * 0.06) | 0}px`;
+    el.style.borderColor = l.color || '';
+  };
   const teamEl = document.getElementById('team'), rowsEl = {};
-  PEOPLE.forEach(p => { const b = document.createElement('button'); b.className = 'row'; b.type = 'button';
-    b.innerHTML = `<div class="ava"><i></i></div><div><b>${p.name} · ${p.role}</b><span></span></div>`; avaStyle(p.key, b.querySelector('.ava'), 34);
-    b.onclick = () => { select(p); centerOn(p.x, p.z, Math.max(cam.u, 60)); }; teamEl.appendChild(b); rowsEl[p.key] = b; });
+  const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function renderTeamList() {
+    teamEl.innerHTML = ''; Object.keys(rowsEl).forEach(k => delete rowsEl[k]);
+    PEOPLE.forEach(p => { const b = document.createElement('button'); b.className = 'row'; b.type = 'button';
+      b.innerHTML = `<div class="ava"><i></i></div><div><b>${escH(p.name)} · ${escH(p.role)}</b><span></span></div>`; avaStyle(p, b.querySelector('.ava'), 34);
+      b.onclick = () => { select(p); centerOn(p.x, p.z, Math.max(cam.u, 60)); }; teamEl.appendChild(b); rowsEl[p.key] = b; });
+    if (selected) rowsEl[selected.key]?.setAttribute('aria-current', 'true');
+  }
   const roomsEl = document.getElementById('rooms');
   ROOMS.forEach(r => { const b = document.createElement('button'); b.className = 'row'; b.type = 'button'; b.innerHTML = `<i class="ico">${r.ico}</i><div><b>${r.name}</b></div>`;
     b.onclick = () => { follow = false; bFollow.setAttribute('aria-pressed', 'false'); centerOn(r.x0 + S / 2, r.z0 + S / 2, Math.min(150, (W - 60) / (2 * S + 1))); }; roomsEl.appendChild(b); });
   function select(p) {
     selected = p; window.OFFICE && window.OFFICE.onSelect && window.OFFICE.onSelect(p); card.hidden = !p; Object.values(rowsEl).forEach(b => b.removeAttribute('aria-current'));
     if (!p) { follow = false; bFollow.setAttribute('aria-pressed', 'false'); return; }
-    rowsEl[p.key].setAttribute('aria-current', 'true'); avaStyle(p.key, document.getElementById('cAva'), 64);
+    rowsEl[p.key]?.setAttribute('aria-current', 'true'); avaStyle(p, document.getElementById('cAva'), 64);
     document.getElementById('cName').textContent = p.name; document.getElementById('cRole').textContent = `${p.role} · ໂມເດວ ${p.model}`;
   }
   function refreshUI() {
-    PEOPLE.forEach(p => { const r = rowsEl[p.key]; r.querySelector('span').textContent = p.doing; r.querySelector('.ava i').style.background = STATUS[p.status]; });
+    PEOPLE.forEach(p => { const r = rowsEl[p.key]; if (!r) return; r.querySelector('span').textContent = p.doing; r.querySelector('.ava i').style.background = STATUS[p.status]; });
     if (selected) { document.getElementById('cDoing').textContent = selected.doing; document.getElementById('cDot').style.background = STATUS[selected.status]; }
   }
 
   // ---------- public API used by app.js ----------
   const STATUS_OF = { idle: 'idle', working: 'work', meeting: 'work', waiting: 'review', done: 'done', error: 'review' };
+  /** build or update the people from the roster: [{ key, name, role, model, seat, look: { sprite, shirt, color }, spot }] */
+  function setTeam(agents) {
+    const keep = new Set(agents.map(a => a.key));
+    for (let i = PEOPLE.length - 1; i >= 0; i--) if (!keep.has(PEOPLE[i].key)) { const gone = PEOPLE.splice(i, 1)[0]; if (gone.target) occupied.delete(gone.target); if (selected === gone) select(null); }
+    const next = agents.map((a, i) => {
+      // no look yet (a server that predates looks): each original employee has a drawing under their own key
+      const want = a.look?.sprite || a.key, sprite = SPRITES[want] && ATLAS[want] ? want : 'kham';
+      const home = SP[a.seat] ? a.seat : SEATS.find(s => !agents.some(b => b.seat === s)) || 'plaza';
+      let p = PEOPLE.find(q => q.key === a.key);
+      if (!p) { const h = SP[home]; p = { key: a.key, x: h.x, z: h.z, state: 'sit', timer: rnd(4, 14) + i * 0.6, path: null, pi: 0, frameT: Math.random() * 5, dir: 'down', hface: 'R', status: 'idle', doing: 'ລໍຖ້າວຽກ', hit: null, forced: null, bubble: '', home }; }
+      const moved = p.home !== home;
+      Object.assign(p, SPRITES[sprite], { name: a.name, role: a.role, model: modelName(a.model), sprite, shirt: a.look?.shirt || null, color: a.look?.color || null, home, spot: a.spot && SP[a.spot[0]] ? a.spot : null });
+      // a new desk: walk over there unless real work keeps them busy
+      if (moved && !p.forced && p.state !== 'walk') { p.state = 'stand'; p.timer = 0.1; }
+      return p;
+    });
+    PEOPLE.length = 0; PEOPLE.push(...next);
+    renderTeamList(); renderCapacity();
+    if (selected) select(selected);
+  }
+
   window.OFFICE = {
     people: PEOPLE,
+    setTeam,
+    seats: () => SEATS.map(k => ({ key: k, label: seatLabel(k), owner: seatOwner(k)?.key || null })),
+    sprites: () => Object.keys(SPRITES).filter(k => ATLAS[k]),
+    sheet, modelName,
+    /** draw one standing frame of a look into a canvas (the staff editor's preview) */
+    preview(canvas, look) {
+      const l = lookOf(look); if (!l || !ATLAS[l.sprite]) return;
+      const f = ATLAS[l.sprite].rows[0][0], sh = sheet(l.sprite, l.shirt), c = canvas.getContext('2d');
+      const k = Math.min(canvas.width / f[2], canvas.height / f[3]);
+      c.clearRect(0, 0, canvas.width, canvas.height); c.drawImage(sh.img, f[0], f[1], f[2], f[3], (canvas.width - f[2] * k) / 2, canvas.height - f[3] * k, f[2] * k, f[3] * k);
+    },
     setLive(key, live) {
       const p = PEOPLE.find(q => q.key === key); if (!p) return;
       p.status = STATUS_OF[live.status] || 'idle';
@@ -420,6 +489,8 @@
     },
     select: p => select(p),
     avatar: (el, key, size) => avaStyle(key, el, size),
+    setSpeed(n) { const v = Number(n); baseSpeed = v > 0 ? v : 1; speed = baseSpeed; bFast.setAttribute('aria-pressed', 'false'); },
+    setBubbles(on) { showBubbles = !!on; },
     focus(key) { const p = PEOPLE.find(q => q.key === key); if (p) { select(p); centerOn(p.x, p.z, Math.max(cam.u, 60)); } },
     onSelect: null,
   };

@@ -1,41 +1,335 @@
 {
   "models": [
-    { "id": "claude-haiku-5-5", "label": "Haiku 5.5 · ໄວ ແລະ ຖືກ" },
-    { "id": "claude-sonnet-5-5", "label": "Sonnet 5.5 · ສົມດຸນ" },
-    { "id": "claude-opus-5-5", "label": "Opus 5.5 · ສະຫຼາດ" },
-    { "id": "claude-fable-5-1", "label": "Fable 5.1 · ສະຫຼາດທີ່ສຸດ (ແພງ)" }
+    {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5 · ໄວ ແລະ ຖືກ"
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5 · ສົມດຸນ"
+    },
+    {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5 · ສະຫຼາດ"
+    },
+    {
+      "id": "claude-fable-5-1",
+      "label": "Fable 5.1 · ສະຫຼາດທີ່ສຸດ (ແພງ)"
+    }
   ],
-  "efforts": ["low", "medium", "high", "xhigh", "max"],
+  "efforts": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "agents": [
-    { "key": "ceo", "name": "ເຈົ້າ", "role": "CEO", "model": "claude-opus-5-5", "effort": "medium", "access": "read", "maxTurns": 20,
-      "prompt": "You stand in for the human CEO. Review plans and results, point out risks, and give a short go / no-go recommendation. You never change files." },
-    { "key": "manee", "name": "ມະນີ", "role": "Business Analyst", "model": "claude-opus-5-5", "effort": "high", "access": "write", "maxTurns": 30,
-      "prompt": "You are the business analyst. Turn the request into clear user stories with acceptance criteria. Write them to docs/requirements/<short-name>.md. Ask nothing back; state your assumptions in the document." },
-    { "key": "somphone", "name": "ສົມພອນ", "role": "Tech Lead", "model": "claude-opus-5-5", "effort": "high", "access": "write", "maxTurns": 40,
-      "prompt": "You are the tech lead. Read the codebase and any requirements in docs/requirements, then write a short technical design and a numbered task breakdown to docs/design/<short-name>.md, naming which team member (Frontend, Backend, QA, DevOps...) should do each task." },
-    { "key": "dao", "name": "ດາວ", "role": "Frontend Developer", "model": "claude-sonnet-5-5", "effort": "medium", "access": "write", "maxTurns": 60,
-      "prompt": "You are the frontend developer. Implement UI changes (HTML, CSS, JavaScript/TypeScript, React) in the workspace. Keep changes small and consistent with the existing code style." },
-    { "key": "bounmy", "name": "ບຸນມີ", "role": "Backend Developer", "model": "claude-sonnet-5-5", "effort": "medium", "access": "write", "maxTurns": 60,
-      "prompt": "You are the backend developer. Implement APIs, data models and server logic in the workspace. Keep changes small and consistent with the existing code style." },
-    { "key": "keo", "name": "ແກ້ວ", "role": "Code Reviewer", "model": "claude-opus-5-5", "effort": "high", "access": "read", "maxTurns": 30,
-      "prompt": "You are the code reviewer. Read the relevant code and report bugs, security problems and risky changes, most important first, with file:line references. You never change files." },
-    { "key": "noy", "name": "ນ້ອຍ", "role": "UI/UX Designer", "model": "claude-sonnet-5-5", "effort": "medium", "access": "write", "maxTurns": 30,
-      "prompt": "You are the UI/UX designer. Propose screens, user flows and visual style. Write specs to docs/design/ui-<short-name>.md; you may also produce simple HTML/CSS mockups under docs/mockups/." },
-    { "key": "phone", "name": "ພອນ", "role": "Mobile Developer", "model": "claude-sonnet-5-5", "effort": "medium", "access": "write", "maxTurns": 60,
-      "prompt": "You are the mobile developer. Implement mobile app or responsive features in the workspace. Keep changes small and consistent with the existing code style." },
-    { "key": "toy", "name": "ຕ້ອຍ", "role": "QA Engineer", "model": "claude-sonnet-5-5", "effort": "medium", "access": "write", "maxTurns": 50,
-      "prompt": "You are the QA engineer. Write or update automated tests for the feature, run them (ask before running commands), and report what passes and what fails." },
-    { "key": "kham", "name": "ຄຳ", "role": "DevOps Engineer", "model": "claude-haiku-5-5", "effort": "medium", "access": "write", "maxTurns": 40,
-      "prompt": "You are the DevOps engineer. Handle build scripts, Dockerfiles, CI configuration and run commands. Never deploy, push or publish anything." },
-    { "key": "sy", "name": "ສີ", "role": "Security Engineer", "model": "claude-sonnet-5-5", "effort": "high", "access": "read", "maxTurns": 30,
-      "prompt": "You are the security engineer. Audit the code for vulnerabilities (injection, secrets in code, auth flaws, unsafe dependencies) and report findings by severity with file:line references. You never change files." },
-    { "key": "saeng", "name": "ແສງ", "role": "Product Manager", "model": "claude-opus-5-5", "effort": "medium", "access": "write", "maxTurns": 20,
-      "prompt": "You are the product manager. Prioritise work, write a short roadmap or release notes to docs/product/, and keep scope small." },
-    { "key": "vanh", "name": "ວັນ", "role": "AI / Data Engineer", "model": "claude-opus-5-5", "effort": "high", "access": "write", "maxTurns": 60,
-      "prompt": "You are the AI and data engineer. Build data pipelines, analytics and LLM features in the workspace." },
-    { "key": "thong", "name": "ທອງ", "role": "Technical Writer", "model": "claude-haiku-5-5", "effort": "medium", "access": "write", "maxTurns": 30,
-      "prompt": "You are the technical writer. Write clear README files, guides and API documentation under docs/ or next to the code you document." },
-    { "key": "chanh", "name": "ຈັນ", "role": "Scrum Master", "model": "claude-haiku-5-5", "effort": "low", "access": "read", "maxTurns": 15,
-      "prompt": "You are the scrum master. Summarise what the team has done and what is blocked, based on the task history you are given. You never change files." }
-  ]
+    {
+      "key": "ceo",
+      "name": "ເຈົ້າ",
+      "role": "CEO",
+      "model": "claude-opus-5-5",
+      "effort": "medium",
+      "access": "read",
+      "maxTurns": 20,
+      "prompt": "You stand in for the human CEO. Review plans and results, point out risks, and give a short go / no-go recommendation. You never change files.",
+      "look": {
+        "sprite": "ceo",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "core1",
+        "ອະນຸມັດວຽກທີ່ AI Core"
+      ],
+      "seat": "ceoSeat"
+    },
+    {
+      "key": "manee",
+      "name": "ມະນີ",
+      "role": "Business Analyst",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "access": "write",
+      "maxTurns": 30,
+      "prompt": "You are the business analyst. Turn the request into clear user stories with acceptance criteria. Write them to docs/requirements/<short-name>.md. Ask nothing back; state your assumptions in the document.",
+      "look": {
+        "sprite": "manee",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "baBoard",
+        "ນຳສະເໜີ requirement ທີ່ກະດານ"
+      ],
+      "seat": "baSeat1"
+    },
+    {
+      "key": "somphone",
+      "name": "ສົມພອນ",
+      "role": "Tech Lead",
+      "model": "claude-opus-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 40,
+      "prompt": "You are the tech lead. Ask scout for facts about the codebase instead of reading large files yourself, then write a short technical design and a numbered task breakdown to docs/design/<short-name>.md, naming which team member (Frontend, Backend, QA, DevOps...) should do each task.",
+      "look": {
+        "sprite": "somphone",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "labAct",
+        "ອະທິບາຍ architecture"
+      ],
+      "seat": "labSeat1"
+    },
+    {
+      "key": "dao",
+      "name": "ດາວ",
+      "role": "Frontend Developer",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 60,
+      "prompt": "You are the frontend developer. Implement UI changes (HTML, CSS, JavaScript/TypeScript, React) in the workspace. Keep changes small and consistent with the existing code style.",
+      "look": {
+        "sprite": "dao",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "core2",
+        "ກວດໜ້າ UI ໃນ hologram"
+      ],
+      "seat": "dev1"
+    },
+    {
+      "key": "bounmy",
+      "name": "ບຸນມີ",
+      "role": "Backend Developer",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 60,
+      "prompt": "You are the backend developer. Implement APIs, data models and server logic in the workspace. Keep changes small and consistent with the existing code style.",
+      "look": {
+        "sprite": "bounmy",
+        "shirt": null,
+        "color": null
+      },
+      "spot": null,
+      "seat": "dev2"
+    },
+    {
+      "key": "keo",
+      "name": "ແກ້ວ",
+      "role": "Code Reviewer",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "access": "read",
+      "maxTurns": 30,
+      "prompt": "You are the code reviewer. Read the relevant code and report bugs, security problems and risky changes, most important first, with file:line references. You never change files.",
+      "look": {
+        "sprite": "keo",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "cafe2",
+        "ອ່ານ code ພ້ອມກາເຟ"
+      ],
+      "seat": "devB1"
+    },
+    {
+      "key": "noy",
+      "name": "ນ້ອຍ",
+      "role": "UI/UX Designer",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 30,
+      "prompt": "You are the UI/UX designer. Propose screens, user flows and visual style. Write specs to docs/design/ui-<short-name>.md; you may also produce simple HTML/CSS mockups under docs/mockups/.",
+      "look": {
+        "sprite": "noy",
+        "shirt": null,
+        "color": null
+      },
+      "spot": null,
+      "seat": "devB2"
+    },
+    {
+      "key": "phone",
+      "name": "ພອນ",
+      "role": "Mobile Developer",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 60,
+      "prompt": "You are the mobile developer. Implement mobile app or responsive features in the workspace. Keep changes small and consistent with the existing code style.",
+      "look": {
+        "sprite": "phone",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "lounge2",
+        "ທົດສອບແອັບໃນມືຖື"
+      ],
+      "seat": "devC1"
+    },
+    {
+      "key": "kham",
+      "name": "ຄຳ",
+      "role": "DevOps Engineer",
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 40,
+      "prompt": "You are the DevOps engineer. Handle build scripts, Dockerfiles, CI configuration and run commands. Never deploy, push or publish anything.",
+      "look": {
+        "sprite": "kham",
+        "shirt": null,
+        "color": null
+      },
+      "spot": null,
+      "seat": "opsSeat1"
+    },
+    {
+      "key": "toy",
+      "name": "ຕ້ອຍ",
+      "role": "QA Engineer",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 50,
+      "prompt": "You are the QA engineer. Write or update automated tests for the feature, run them (ask before running commands), and report what passes and what fails.",
+      "look": {
+        "sprite": "toy",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "qaHolo",
+        "ກວດຜົນເທສໃນ hologram"
+      ],
+      "seat": "qaSeat"
+    },
+    {
+      "key": "sy",
+      "name": "ສີ",
+      "role": "Security Engineer",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "access": "read",
+      "maxTurns": 30,
+      "prompt": "You are the security engineer. Audit the code for vulnerabilities (injection, secrets in code, auth flaws, unsafe dependencies) and report findings by severity with file:line references. You never change files.",
+      "look": {
+        "sprite": "sy",
+        "shirt": null,
+        "color": null
+      },
+      "spot": null,
+      "seat": "opsSeat2"
+    },
+    {
+      "key": "saeng",
+      "name": "ແສງ",
+      "role": "Product Manager",
+      "model": "claude-opus-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 20,
+      "prompt": "You are the product manager. Prioritise work, write a short roadmap or release notes to docs/product/, and keep scope small.",
+      "look": {
+        "sprite": "saeng",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "meet1",
+        "ນຳປະຊຸມ planning ໃນສວນ"
+      ],
+      "seat": "baSeat2"
+    },
+    {
+      "key": "vanh",
+      "name": "ວັນ",
+      "role": "AI / Data Engineer",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "access": "write",
+      "maxTurns": 60,
+      "prompt": "You are the AI and data engineer. Build data pipelines, analytics and LLM features in the workspace.",
+      "look": {
+        "sprite": "vanh",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "labHolo",
+        "ວິເຄາະ neural network ໃນ hologram"
+      ],
+      "seat": "labSeat3"
+    },
+    {
+      "key": "thong",
+      "name": "ທອງ",
+      "role": "Technical Writer",
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "access": "write",
+      "maxTurns": 30,
+      "prompt": "You are the technical writer. Write clear README files, guides and API documentation under docs/ or next to the code you document.",
+      "look": {
+        "sprite": "thong",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "lounge1",
+        "ຂຽນເອກະສານໃນ Lounge"
+      ],
+      "seat": "devC2"
+    },
+    {
+      "key": "chanh",
+      "name": "ຈັນ",
+      "role": "Scrum Master",
+      "model": "claude-haiku-5-5",
+      "effort": "low",
+      "access": "read",
+      "maxTurns": 15,
+      "prompt": "You are the scrum master. Summarise what the team has done and what is blocked, based on the task history you are given. You never change files.",
+      "look": {
+        "sprite": "chanh",
+        "shirt": null,
+        "color": null
+      },
+      "spot": [
+        "meet2",
+        "ນຳ stand-up meeting ໃນສວນ"
+      ],
+      "seat": "devC3"
+    },
+    {
+      "key": "scout",
+      "name": "ສຸກ",
+      "role": "Code Scout",
+      "model": "claude-haiku-5-5",
+      "effort": "low",
+      "access": "read",
+      "maxTurns": 15,
+      "prompt": "You are the code scout. Explore the codebase to answer the question you are given. Reply in under 300 words: the relevant files with path:line, how they fit together, and the key functions or settings. Never paste whole files or long code blocks; quote at most a few lines. You never change files.",
+      "look": {
+        "sprite": "kham",
+        "shirt": null,
+        "color": null
+      },
+      "spot": null,
+      "seat": "dev4"
+    }
+  ],
+  "archived": []
 }

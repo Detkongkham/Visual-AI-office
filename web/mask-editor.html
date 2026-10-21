@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="lo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shirt Mask Editor</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700;800&display=swap">
+<style>
+  :root { --bg: #f4f1fb; --panel: #fff; --fg: #2a2238; --muted: #6b6380; --line: #e2dcec; --accent: #6a4fd8; --accent-fg: #fff; }
+  :root[data-theme="dark"] { --bg: #1d1a29; --panel: #262136; --fg: #ece8f4; --muted: #a59fb6; --line: #3a3450; --accent: #9d86ff; --accent-fg: #160f2e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px "Noto Sans Lao", system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0 8px 0 0; font-size: 16px; }
+  select, button, input[type=number] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+  button { cursor: pointer; font-weight: 700; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border: 0; }
+  button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  #status { color: var(--muted); font-size: 13px; min-width: 12em; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 40%); gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .rowTitle { margin: 12px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .frames { display: flex; flex-wrap: wrap; gap: 4px; }
+  .frames canvas { background: #cfcfcf; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+  .frames canvas.on { border-color: var(--accent); }
+  body.overview main { grid-template-columns: 1fr; }
+  body.overview #editWrap { display: none; }
+  body.overview .frames canvas { height: 105px; width: auto; }
+  #editWrap { position: sticky; top: 64px; align-self: start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  #edit { width: 100%; background: #cfcfcf; border-radius: 8px; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎨 Shirt Mask Editor</h1>
+  <label>ຮູບ <select id="sprite"></select></label>
+  <label>ສີທົດລອງ <input type="color" id="color" value="#ff00ff"></label>
+  <label><input type="checkbox" id="showTint" checked> ສະແດງສີທົດລອງ</label>
+  <label><input type="checkbox" id="overview"> ເບິ່ງລວມ (ເຊື່ອງບ່ອນແຕ້ມ)</label>
+  <button type="button" id="auto">↻ ສ້າງອັດຕະໂນມັດໃໝ່ (ທັງຮູບ)</button>
+  <button type="button" class="primary" id="save">💾 ບັນທຶກ</button>
+  <span id="status" role="status"></span>
+</header>
+<main>
+  <section id="grid"></section>
+  <aside id="editWrap">
+    <div class="tools">
+      <button type="button" id="mAdd" aria-pressed="true">🖌 ເພີ່ມ</button>
+      <button type="button" id="mErase" aria-pressed="false">🧽 ລຶບ</button>
+      <label>ຂະໜາດ <input type="number" id="size" min="1" max="40" value="6" style="width:4.5em"></label>
+      <button type="button" id="undo">↶ ຍ້ອນກັບ</button>
+      <button type="button" id="frameAuto">↻ ເຟຣມນີ້ອັດຕະໂນມັດ</button>
+      <button type="button" id="frameClear">ລ້າງເຟຣມນີ້</button>
+    </div>
+    <canvas id="edit" width="10" height="10"></canvas>
+    <p class="hint">ກົດເຟຣມທາງຊ້າຍເພື່ອແກ້. ແຕ້ມເທິງສ່ວນທີ່ເປັນເສື້ອເພື່ອເພີ່ມ, ໃຊ້ 🧽 ລຶບສ່ວນທີ່ບໍ່ແມ່ນເສື້ອ (ຜົມ, ໜ້າ, ອຸປະກອນ). ກົດ Shift ຄ້າງໄວ້ເພື່ອລຶບຊົ່ວຄາວ. ສີບົວ = ໜ້າກາກ. ແກ້ແລ້ວກົດ 💾 ບັນທຶກ ຈາກນັ້ນ reload ຫ້ອງການ.</p>
+  </aside>
+</main>
+<script src="assets/atlas.js"></script>
+<script src="tint.js"></script>
+<script src="mask-editor.js"></script>
+</body>
+</html>
